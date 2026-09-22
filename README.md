@@ -1,1 +1,1 @@
-# agile-response-filter-fpga
+# Hardware Chess Engine on an FPGA
