@@ -12,11 +12,11 @@ import chisel3.util._
 class Main(depth: Int, color: Boolean) extends Module {
     val io = IO(new Bundle {
     // U-ART Input
-    val newBoard = Input(Vec(8, Vec(8, UInt(16.W))))
+        val newBoard = Input(Vec(8, Vec(8, UInt(16.W))))
 
-    // Outputs for Eval 
-    val isLate = Output(Bool())
-    
+        // Outputs for Eval 
+        val isLate = Output(Bool())
+
     })
 
     // Registers
