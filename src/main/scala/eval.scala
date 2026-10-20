@@ -4,13 +4,13 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
     // INPUT
     // Board position
     // Is it late-game?
+    val boardState = Vec(8, Vec(8, 16.W))
 
     // OUTPUT
     // Eval Score
-
-
+    val score = SInt(16.W)
   })
-  
+
   // Piece-square tables
   // https://chessprogramming.org/Simplified_Evaluation_Function
   val pawnTable = VecInit(
@@ -104,5 +104,61 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
     )
   )
 
+  def evaluateSquare(piece: UInt, row: Int, col: Int): SInt = {
+    val result = Wire(SInt(16.W))
+    
+    switch(piece) {
+      is(0.U) { // Empty
+        result := 0.S
+      }
+      is(1.U) { // White Pawn
+        result := 100.S + pawnTable(7 - row)(col)
+      }
+      is(2.U) { // White Knight
+        result := 320.S + knightTable(7 - row)(col)
+      }
+      is(3.U) { // White Bishop
+        result := 330.S + bishopTable(7 - row)(col)
+      }
+      is(4.U) { // White Rook
+        result := 500.S + rookTable(7 - row)(col)
+      }
+      is(5.U) { // White Queen
+        result := 900.S + queenTable(7 - row)(col)
+      }
+      is(6.U) { // White King (Middle Game)
+        result := 20000.S + kingMiddleGameTable(7 - row)(col)
+      }
+      is(7.U) { // Black Pawn
+        result := -100.S - pawnTable(row)(col)
+      }
+      is(8.U) { // Black Knight
+        result := -320.S - knightTable(row)(col)
+      }
+      is(9.U) { // Black Bishop
+        result := -330.S - bishopTable(row)(col)
+      }
+      is(10.U) { // Black Rook
+        result := -500.S - rookTable(row)(col)
+      }
+      is(11.U) { // Black Queen
+        result := -900.S - queenTable(row)(col)
+      }
+      is(12.U) { // Black King (Middle Game)
+        result := -20000.S - kingMiddleGameTable(row)(col)
+      }
+
+    }
+    result
+  }
+
+  val evaluations = (0 until 8).flatmap { row =>
+      (0 until 8).map {col =>
+        evaluateSquare(io.boardState(row)(col), row, col)
+      }
+  }
+  val totalEval = evaluations.reduceTree(_ +& _)
+
+  io.score := totalEval
 
 }
