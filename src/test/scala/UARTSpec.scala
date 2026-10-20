@@ -4,7 +4,7 @@ import org.scalatest.flatspec.AnyFlatSpec
 
 class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
   "UART" should "transmit data correctly" in {
-    test(new Uart(baudRate = 115200, clockFreq = 1000000)) { dut =>
+    test(new UartTx(baudRate = 115200, clockFreq = 1000000)) { dut =>
         val testBoard = Seq(
             Seq(1, 2, 3, 4, 5, 6, 0, 0),
             Seq(0, 0, 0, 0, 0, 0, 0, 0),
