@@ -1,6 +1,24 @@
 import chisel3._
 import chisel3.util._
 
+// Piece definition 
+object pieces {
+    val  white_pawn   = 1.U(4.W)
+    val white_bishop = 2.U(4.W)
+    val white_knight = 3.U(4.W)
+    val white_rook   = 4.U(4.W)
+    val white_queen  = 5.U(4.W)
+    val white_king   = 6.U(4.W)
+
+    val black_pawn   = 7.U(4.W)
+    val black_bishop = 8.U(4.W)
+    val black_knight = 9.U(4.W)
+    val black_rook   = 10.U(4.W) 
+    val black_queen  = 11.U(4.W)
+    val black_king   = 12.U(4.W)
+}
+
+
 class Main(depth: Int, color: Boolean) extends Module {
     val io = IO(new Bundle {
         // U-ART Input
@@ -17,23 +35,7 @@ class Main(depth: Int, color: Boolean) extends Module {
     val blackMaterial = RegInit(0.U(16.W))
     val isLateReg = RegInit(false.B)
 
-    // Piece definition 
-    object pieces {
-        white_pawn   = 1.U(4.W)
-        white_bishop = 2.U(4.W)
-        white_knight = 3.U(4.W)
-        white_rook   = 4.U(4.W)
-        white_queen  = 5.U(4.W)
-        white_king   = 6.U(4.W)
-
-        black_pawn   = 7.U(4.W)
-        black_bishop = 8.U(4.W)
-        black_knight = 9.U(4.W)
-        black_rook   = 10.U(4.W) 
-        black_queen  = 11.U(4.W)
-        black_king   = 12.U(4.W)
-    }
-
+    
     // Determines if it is lategame
     when(whiteMaterial + blackMaterial <= 2400.U) {
         io.isLate := true.B
