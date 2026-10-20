@@ -42,20 +42,20 @@ class Main(depth: Int, color: Boolean) extends Module {
     }
 
     // Calculates the material value of a piece
-def materialValue(piece: UInt): UInt = {
-    MuxLookup(piece, 0.U(16.W))(Seq(
-        pieces.white_pawn   -> 100.U(16.W),
-        pieces.white_bishop -> 300.U(16.W),
-        pieces.white_knight -> 300.U(16.W),
-        pieces.white_rook   -> 500.U(16.W),
-        pieces.white_queen  -> 900.U(16.W),
-        pieces.black_pawn   -> 100.U(16.W),
-        pieces.black_bishop -> 300.U(16.W),
-        pieces.black_knight -> 300.U(16.W),
-        pieces.black_rook   -> 500.U(16.W),
-        pieces.black_queen  -> 900.U(16.W)
-    ))
-}
+    def materialValue(piece: UInt): UInt = {
+        MuxLookup(piece, 0.U(16.W))(Seq(
+            pieces.white_pawn   -> 100.U(16.W),
+            pieces.white_bishop -> 300.U(16.W),
+            pieces.white_knight -> 300.U(16.W),
+            pieces.white_rook   -> 500.U(16.W),
+            pieces.white_queen  -> 900.U(16.W),
+            pieces.black_pawn   -> 100.U(16.W),
+            pieces.black_bishop -> 300.U(16.W),
+            pieces.black_knight -> 300.U(16.W),
+            pieces.black_rook   -> 500.U(16.W),
+            pieces.black_queen  -> 900.U(16.W)
+        ))
+    }
 
     // Generate material values for all white pieces
     val whiteValues = for {
