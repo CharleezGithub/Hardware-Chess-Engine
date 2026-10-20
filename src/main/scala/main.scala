@@ -16,7 +16,7 @@ class Main(depth: Int, color: Boolean) extends Module {
 
         // Outputs for Eval 
         val isLate = Output(Bool())
-
+        val board = Output(Vec(8, Vec(8, UInt(16.W)))) // To share with UART module later
     })
 
     // Registers
@@ -45,6 +45,7 @@ class Main(depth: Int, color: Boolean) extends Module {
 
     // IO-REG CONNECTIONS
     io.isLate := isLateReg
+    io.board := Board
 }
 
 object Main extends App {

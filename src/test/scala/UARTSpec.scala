@@ -34,7 +34,7 @@ class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
     
             for (byte <- bytesToSend) {
                 // Start bit
-                println(s"Expecting start bit for byte: $byte")
+                // println(s"Expecting start bit for byte: $byte")
                 while (dut.io.tx.peek().litToBoolean) { // trap until tx goes low
                     dut.clock.step(1)
                 }
