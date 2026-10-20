@@ -26,3 +26,4 @@ metals.sbt
 version.txt
 latest-version.txt
 .bsp
+Main.anno.json

@@ -10,8 +10,9 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
 
 
   })
+  
   // Piece-square tables
-
+  // https://chessprogramming.org/Simplified_Evaluation_Function
   val pawnTable = VecInit(
     Seq(
       VecInit(Seq(0, 0, 0, 0, 0, 0, 0, 0).map(_.S(8.W))),
