@@ -18,4 +18,5 @@ class BoardSpec extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.isLate.expect(false.B)
         }
     }
+
 }
