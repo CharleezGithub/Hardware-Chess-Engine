@@ -22,20 +22,26 @@ object pieces {
 class Board(depth: Int, color: Boolean) extends Module {
     val io = IO(new Bundle {
         // U-ART Input, TODO: when we have UART rx signal
-        //val newBoard = Input(Vec(8, Vec(8, UInt(16.W))))
-
+        val newBoard = Input(Vec(8, Vec(8, UInt(4.W))))
+        val updBoard = Input(Bool())
         // Outputs for Eval 
         val isLate = Output(Bool())
-        val board = Output(Vec(8, Vec(8, UInt(16.W)))) // To share with UART module later
+        val board = Output(Vec(8, Vec(8, UInt(4.W)))) // To transmit the board state via UART
+        val playerTurn = Output(Bool()) // True for white, false for black
     })
 
     // Registers
-    val Board = RegInit(VecInit(Seq.fill(8)(VecInit(Seq.fill(8)(0.U(16.W))))))
+    val initSeq = Seq.tabulate(8, 8) { (r, c) => // Just have a king piece to move around for now
+    if (r == 4 && c == 4) pieces.white_king else 0.U(4.W)
+    }
+    val Board = RegInit(VecInit(initSeq.map(row => VecInit(row))))
     val whiteMaterial = RegInit(0.U(16.W))
     val blackMaterial = RegInit(0.U(16.W))
     val isLateReg = RegInit(false.B)
-
-    
+    val playerTurnReg = RegInit(color.B) // True for white, false for black
+    when(io.updBoard) {
+        Board := io.newBoard
+    }
     // Determines if it is lategame
     when(whiteMaterial + blackMaterial <= 2400.U) {
         io.isLate := true.B
@@ -62,7 +68,7 @@ class Board(depth: Int, color: Boolean) extends Module {
         row <- 0 until 8
         col <- 0 until 8
     } yield {
-        val piece = Board(row)(col)(3, 0)
+        val piece = Board(row)(col)
         Mux(
             piece >= pieces.white_pawn &&
             piece <= pieces.white_king,
@@ -76,7 +82,7 @@ class Board(depth: Int, color: Boolean) extends Module {
         row <- 0 until 8
         col <- 0 until 8
     } yield {
-        val piece = Board(row)(col)(3, 0)
+        val piece = Board(row)(col)
         Mux(
             piece >= pieces.black_pawn &&
             piece <= pieces.black_king,
@@ -93,4 +99,5 @@ class Board(depth: Int, color: Boolean) extends Module {
     // IO-REG CONNECTIONS
     io.isLate := isLateReg
     io.board := Board
+    io.playerTurn := playerTurnReg
 }

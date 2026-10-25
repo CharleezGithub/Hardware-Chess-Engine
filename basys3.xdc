@@ -15,14 +15,14 @@ create_clock -add -name sys_clk_pin -period 10.00 -waveform {0 5} [get_ports { c
 ## Reset - left most switch
 set_property -dict { PACKAGE_PIN R2    IOSTANDARD LVCMOS33 } [get_ports { reset }]
 
-## Buttons (Changed 'button' -> 'io_buttons')
+## Buttons
 set_property -dict { PACKAGE_PIN T18   IOSTANDARD LVCMOS33 } [get_ports { io_buttons[0] }]
 set_property -dict { PACKAGE_PIN U17   IOSTANDARD LVCMOS33 } [get_ports { io_buttons[1] }]
 set_property -dict { PACKAGE_PIN W19   IOSTANDARD LVCMOS33 } [get_ports { io_buttons[2] }]
 set_property -dict { PACKAGE_PIN T17   IOSTANDARD LVCMOS33 } [get_ports { io_buttons[3] }]
 set_property -dict { PACKAGE_PIN U18   IOSTANDARD LVCMOS33 } [get_ports { io_buttons[4] }]
 
-## LEDs (Changed 'led' -> 'io_led')
+## LEDs
 set_property -dict { PACKAGE_PIN U16   IOSTANDARD LVCMOS33 } [get_ports { io_led[0] }]
 set_property -dict { PACKAGE_PIN E19   IOSTANDARD LVCMOS33 } [get_ports { io_led[1] }]
 set_property -dict { PACKAGE_PIN U19   IOSTANDARD LVCMOS33 } [get_ports { io_led[2] }]
@@ -40,8 +40,8 @@ set_property -dict { PACKAGE_PIN N3    IOSTANDARD LVCMOS33 } [get_ports { io_led
 set_property -dict { PACKAGE_PIN P1    IOSTANDARD LVCMOS33 } [get_ports { io_led[14] }]
 set_property -dict { PACKAGE_PIN L1    IOSTANDARD LVCMOS33 } [get_ports { io_led[15] }]
 
-## USB-RS232 Interface (Changed 'rx'/'tx' -> 'io_rx'/'io_tx')
-# set_property -dict { PACKAGE_PIN B18   IOSTANDARD LVCMOS33 } [get_ports { io_rx }]
+## USB-RS232 Interface
+set_property -dict { PACKAGE_PIN B18   IOSTANDARD LVCMOS33 } [get_ports { io_rx }]
 set_property -dict { PACKAGE_PIN A18   IOSTANDARD LVCMOS33 } [get_ports { io_tx }]
 
 ## VGA

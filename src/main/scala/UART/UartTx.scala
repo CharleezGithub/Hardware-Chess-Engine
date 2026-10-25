@@ -6,23 +6,22 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
     val io = IO(new Bundle {
         val tx = Output(Bool())
         val busy = Output(Bool()) // State of the UART transmitter
-        val board = Input(Vec(8, Vec(8, UInt(16.W)))) // 8x8 chess board input to be printed
+        val board = Input(Vec(8, Vec(8, UInt(4.W)))) // 8x8 chess board input to be printed
         val sendData = Input(Bool())
     })
     // For now just print out board through UART
     val countMax = (clockFreq / baudRate)
     val cnt = RegInit(0.U(log2Ceil(countMax + 1).W))
-    val dataBoard = RegInit(VecInit(Seq.fill(8)(VecInit(Seq.fill(8)(0.U(16.W))))))
+    val dataBoard = RegInit(VecInit(Seq.fill(8)(VecInit(Seq.fill(8)(0.U(4.W))))))
     
-    val byteIndex = RegInit(0.U(7.W)) // 0-127, 8 * 8 board, and two bytes per square
+    val byteIndex = RegInit(0.U(5.W)) // 8x8 board, half a byte per square
     val bitCnt = RegInit(0.U(3.W)) // Uart transmits a byte at a time, so we need to count up to 8
 
     
     val sIdle :: sStart :: sData :: sStop :: Nil = Enum(4)
     val state = RegInit(sIdle)
-    val currentSq = dataBoard(byteIndex(6,4))(byteIndex(3,1))
-    
-    val currentByte = Mux(byteIndex(0), currentSq(15, 8), currentSq(7, 0))
+
+    val currentByte = Cat(dataBoard(byteIndex(4, 2))(byteIndex(1, 0) << 1), dataBoard(byteIndex(4, 2))((byteIndex(1, 0) << 1) + 1.U)) // Concatenate the two squares to form a byte
     io.tx := true.B // idle state is high
     io.busy := (state =/= sIdle)
 
@@ -64,7 +63,7 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
             io.tx := true.B // stop bit is high
             when(cnt === (countMax - 1).U) {
                 cnt := 0.U 
-                when(byteIndex === 127.U) { // 8 * 8 board, and two bytes per square
+                when(byteIndex === 31.U) { // 8 * 8 board, half a byte per square, so 32 bytes total
                     state := sIdle
                 }.otherwise {
                     byteIndex := byteIndex + 1.U
