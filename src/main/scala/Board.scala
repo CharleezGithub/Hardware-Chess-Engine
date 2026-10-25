@@ -19,10 +19,10 @@ object pieces {
 }
 
 
-class Main(depth: Int, color: Boolean) extends Module {
+class Board(depth: Int, color: Boolean) extends Module {
     val io = IO(new Bundle {
-        // U-ART Input
-        val newBoard = Input(Vec(8, Vec(8, UInt(16.W))))
+        // U-ART Input, TODO: when we have UART rx signal
+        //val newBoard = Input(Vec(8, Vec(8, UInt(16.W))))
 
         // Outputs for Eval 
         val isLate = Output(Bool())
@@ -93,8 +93,4 @@ class Main(depth: Int, color: Boolean) extends Module {
     // IO-REG CONNECTIONS
     io.isLate := isLateReg
     io.board := Board
-}
-
-object Main extends App {
-    emitVerilog(new Main(depth = 16, color = true))
 }

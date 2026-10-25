@@ -4,31 +4,56 @@ import sys
 import struct
 
 # Definitions
-serial_port = '/dev/ttyUSB0'
+serial_port = '/dev/ttyUSB1'
 baud_rate = 115200
+
+chessPieces = {
+    0x0000: "0", # Empty square
+    0x0001: "P", # White Pawn
+    0x0002: "B", # White Bishop
+    0x0003: "N", # White Knight
+    0x0004: "R", # White Rook
+    0x0005: "Q", # White Queen
+    0x0006: "K", # White King
+    0x0007: "p", # Black Pawn
+    0x0008: "b", # Black Bishop
+    0x0009: "n", # Black Knight
+    0x000A: "r", # Black Rook
+    0x000B: "q", # Black Queen
+    0x000C: "k", # Black King
+}
+
+def board_to_string(squares):
+    output = ""
+    for i, square_val in enumerate(squares):
+        pieceString = chessPieces.get(square_val, "?")
+        output += pieceString + " "
+        if (i + 1) % 8 == 0:
+            output += "\n"
+    return output
+
 
 def send_data(ser, data): # TODO: Implement this function to send chess board via UART
     return
 
 def receive_data(ser): # Listen to UART data, that descripes our 8x8 chess board with each square being two bytes
     buffer = bytearray()
+    BOARD_BYTES = 8 * 8 * 2  # 8x8 board, each square is 2 bytes
     try:
-        output = bytearray()
+        print("Listening for chess board data...")
         while True:
-            if ser.in_waiting > 0:
-                data = ser.read(ser.in_waiting)
-                buffer.extend(data)
-                while len(buffer) >= 2:
-                    square_data = buffer[:2]
-                    buffer = buffer[2:]
-                    square_value = struct.unpack('<H', square_data)[0]  # Unpack as little-endian unsigned short
-                    output.append(square_value)
+            chunk = ser.read(max(1, ser.in_waiting))
 
-            print("Received chess board data:")
-            for i in range(8):
-                row = output[i*8:(i+1)*8]
-                print(' '.join(f"{val:04x}" for val in row))
-            time.sleep(1)  # Adjust the sleep time as needed
+            if chunk:
+                buffer.extend(chunk)
+            while len(buffer) >= BOARD_BYTES:
+                frame = buffer[:BOARD_BYTES]
+                buffer = buffer[BOARD_BYTES:]
+
+                squares = struct.unpack('>64H', frame)  # Unpack 64 unsigned shorts (16-bit)
+
+                print("Received chess board data:")
+                print(board_to_string(squares))
                     
     except KeyboardInterrupt:
         print("KeyboardInterrupt detected. Exiting...")
@@ -41,13 +66,23 @@ def main():
 
     print("Press enter to continue or e to exit.")
     
-    if input() == 'e':
+    if input().strip().lower() == 'e':
         return
 
     try:
-        ser = serial.Serial(serial_port, baud_rate, timeout=1)
-        receive_data(ser)
+        with serial.Serial(
+            port=serial_port,
+            baudrate=baud_rate,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            timeout=0.1
+        ) as ser:
+            receive_data(ser)
 
 
     except Exception:
         print("Couldnt open serial port.")
+
+if __name__ == "__main__":
+    main()

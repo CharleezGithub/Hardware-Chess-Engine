@@ -16,3 +16,8 @@ Cleanup the repository with:
 ```bash
 make clean
 ```
+
+# Find USB port for FPGA
+```bash
+ls -l /dev/serial/by-id/
+```

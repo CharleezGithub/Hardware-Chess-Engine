@@ -1,14 +1,16 @@
 import chisel3._
+import chisel3.util._
+
 class MatrixBuffer8x8(val width: Int = 16) extends Module {
   val io = IO(new Bundle {
     // INPUT
     // Board position
     // Is it late-game?
-    val boardState = Vec(8, Vec(8, 16.W))
+    val boardState = Input(Vec(8, Vec(8, UInt(16.W))))
 
     // OUTPUT
     // Eval Score
-    val score = SInt(16.W)
+    val score = Output(SInt(16.W))
   })
 
   // Piece-square tables
@@ -105,7 +107,7 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
   )
 
   def evaluateSquare(piece: UInt, row: Int, col: Int): SInt = {
-    val result = Wire(SInt(16.W))
+    val result = WireDefault(0.S(16.W))
     
     switch(piece) {
       is(0.U) { // Empty
@@ -152,12 +154,12 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
     result
   }
 
-  val evaluations = (0 until 8).flatmap { row =>
+  val evaluations = (0 until 8).flatMap { row =>
       (0 until 8).map {col =>
         evaluateSquare(io.boardState(row)(col), row, col)
       }
   }
-  val totalEval = evaluations.reduceTree(_ +& _)
+  val totalEval = VecInit(evaluations).reduceTree(_ +& _)
 
   io.score := totalEval
 
