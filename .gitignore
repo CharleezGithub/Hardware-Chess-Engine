@@ -27,3 +27,8 @@ version.txt
 latest-version.txt
 .bsp
 Main.anno.json
+__pycache__/
+*.pyc
+*.jou
+*.log
+.Xil/
