@@ -58,6 +58,8 @@ the default generated `Top` directly to 100 MHz: its UART is configured for the
 20 MHz clock. The existing `basys3.xdc` supplies the pins and oscillator timing.
 Switch 15 resets the hardware. Button 0 queues a new game. LEDs 0–2 show game
 status, LED 8 shows controller activity, and LED 9 shows UART transmission.
+Use `new` to restart while the client is open. After a physical reset, restart
+the client to begin a fresh serial session.
 
 ## Verification
 
