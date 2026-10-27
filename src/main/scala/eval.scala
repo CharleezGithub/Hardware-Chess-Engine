@@ -114,7 +114,7 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
         result := 0.S
       }
       is(1.U) { // White Pawn
-        result := 100.S + pawnTable(7 - row)(col)
+        result := 100.S + pawnTable(row)(col)
       }
       is(2.U) { // White Knight
         result := 320.S + knightTable(7 - row)(col)
@@ -126,13 +126,13 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
         result := 500.S + rookTable(7 - row)(col)
       }
       is(5.U) { // White Queen
-        result := 900.S + queenTable(7 - row)(col)
+        result := 900.S + queenTable(row)(col)
       }
-      is(6.U) { // White King (Middle Game)
-        result := 20000.S + kingMiddleGameTable(7 - row)(col)
+      is(6.U) { // White king (endgame).
+        result := 20000.S + kingEndGameTable(row)(col)
       }
       is(7.U) { // Black Pawn
-        result := -100.S - pawnTable(row)(col)
+        result := -100.S - pawnTable(7 - row)(col)
       }
       is(8.U) { // Black Knight
         result := -320.S - knightTable(row)(col)
@@ -144,10 +144,10 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
         result := -500.S - rookTable(row)(col)
       }
       is(11.U) { // Black Queen
-        result := -900.S - queenTable(row)(col)
+        result := -900.S - queenTable(7 - row)(col)
       }
-      is(12.U) { // Black King (Middle Game)
-        result := -20000.S - kingMiddleGameTable(row)(col)
+      is(12.U) { // Black king (endgame).
+        result := -20000.S - kingEndGameTable(7 - row)(col)
       }
 
     }

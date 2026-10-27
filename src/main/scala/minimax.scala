@@ -48,6 +48,8 @@ class minimax(maxDepth: Int) extends Module {
         val bestScore = Output(SInt(32.W))
         val busy = Output(Bool())
         val done = Output(Bool())
+        val hasLegalMove = Output(Bool())
+        val rootInCheck = Output(Bool())
     })
 
     // Registers
@@ -70,6 +72,7 @@ class minimax(maxDepth: Int) extends Module {
 
     // score der returneres fra en branch
     val returnedScore = RegInit(0.S(32.W))
+    val rootCheckReg = RegInit(false.B)
 
     val maxScore = 1000000.S(32.W)
     val minScore = (-1000000).S(32.W)
@@ -97,7 +100,7 @@ class minimax(maxDepth: Int) extends Module {
     val state = RegInit(sIdle)
 
     // The generator scans while we wait and holds its answer until we leave.
-    io.moveRequest := state === sGetMove
+    io.moveRequest := state === sGetMove || state === sEvaluate
 
     switch(state) {
 
@@ -117,6 +120,7 @@ class minimax(maxDepth: Int) extends Module {
             bestMoveReg := 0.U
             bestScoreReg := 0.S
             returnedScore := 0.S
+            rootCheckReg := false.B
 
             // initialiser root
             searchReg(0).nextMove := 0.U
@@ -156,6 +160,7 @@ class minimax(maxDepth: Int) extends Module {
                 // ingen flere moves ved denne depth
 
                 when(currentDepth === 0.U) {
+                    rootCheckReg := io.inCheck
                     // hele søgningen er færdig
                     when(searchReg(0).hasScored) {
                         bestMoveReg := searchReg(0).bestMove
@@ -265,11 +270,17 @@ class minimax(maxDepth: Int) extends Module {
         }
 
         is(sEvaluate) {
-            // evaluer board ved maxDepth
-            // evaluator returnerer score fra white perspective
-            returnedScore := evaluator.io.score
-
-            state := sBacktrack
+            // Even at the depth limit, check for mate/stalemate before using
+            // the static score. Finding one legal move is enough here.
+            when(io.moveValid) {
+                returnedScore := evaluator.io.score
+                state := sBacktrack
+            }.elsewhen(io.moveFinished) {
+                returnedScore := Mux(io.inCheck,
+                    Mux(currentWhiteTurn, -mateScore + currentDepth.zext,
+                        mateScore - currentDepth.zext), 0.S)
+                state := sBacktrack
+            }
         }
 
         is(sBacktrack) {
@@ -334,4 +345,6 @@ class minimax(maxDepth: Int) extends Module {
 
     io.busy := state =/= sIdle && state =/= sDone
     io.done := state === sDone
+    io.hasLegalMove := state === sDone && searchReg(0).hasMove
+    io.rootInCheck := rootCheckReg
 }
