@@ -103,7 +103,7 @@ class BoardTests(unittest.TestCase):
         self.click(36)
         self.assertTrue(app.busy)
         self.assertEqual(app.board, initial_board())
-        self.assertEqual(str(app.new_button['state']), 'disabled')
+        self.assertEqual(app.menu.entrycget('New game', 'state'), 'disabled')
         self.click(54)
         self.click(38)
         heartbeat = []
@@ -132,8 +132,8 @@ class BoardTests(unittest.TestCase):
             app.submit(2)
             self.wait_for(lambda: not app.busy)
             self.assertFalse(app.can_move())
-            self.assertEqual(str(app.new_button['state']), 'normal')
-        app.submit(1)
+            self.assertEqual(app.menu.entrycget('New game', 'state'), 'normal')
+        app.menu.invoke('New game')
         self.wait_for(lambda: not app.busy)
         self.assertTrue(app.can_move())
 
@@ -151,7 +151,7 @@ class BoardTests(unittest.TestCase):
         self.wait_for(lambda: not app.busy)
         self.assertFalse(app.connected)
         self.assertIn("Disconnected test device", app.detail.get())
-        app.reconnect()
+        app.menu.invoke('Reconnect')
         self.wait_for(lambda: not app.busy)
         self.assertTrue(app.connected)
         self.assertTrue(transports[0].closed)

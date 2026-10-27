@@ -41,8 +41,10 @@ python chess_gui.py
 
 Click a white piece and its destination, or drag and drop it. The engine plays
 black. The board highlights changed squares after each turn and reports illegal
-moves and game results. Use **New game**, **Refresh board**, **Flip board**, or
-**Reconnect** in the sidebar; Escape clears the selection.
+moves and game results in the window title. Right-click the board for **New game**,
+**Refresh board**, **Flip board**, or **Reconnect**; Escape clears the selection.
+The window shows only the board and coordinates. UART does not currently send
+an evaluation score, so no score is displayed.
 
 The window imports the existing CLI's transport from `UART.py`. All move
 validation, promotion, and engine play still run in the hardware RTL. Requests

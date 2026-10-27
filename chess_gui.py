@@ -3,18 +3,14 @@ import argparse
 import queue
 import threading
 import tkinter as tk
-from tkinter import font as tkfont
+from tkinter import font as tkfont, messagebox
 
 from UART import SerialTransport, SimulationTransport, STATUS, command_frame
 
 WHITE = (1, 5, 6)
 GLYPHS = {1: "♟", 5: "♛", 6: "♚", 7: "♟", 11: "♛", 12: "♚"}
-BG, PANEL, TEXT, MUTED = "#112128", "#1b3038", "#f0f1e9", "#a7bbc0"
-LIGHT, DARK, ACCENT = "#e7e4d1", "#729286", "#89d6b7"
-
-
-def square_name(square):
-    return chr(ord("a") + square % 8) + str(8 - square // 8)
+BG, MUTED = "#112128", "#a7bbc0"
+LIGHT, DARK = "#e7e4d1", "#729286"
 
 
 class EngineWorker:
@@ -67,7 +63,7 @@ class EngineWorker:
 
 
 class ChessWindow:
-    def __init__(self, root, transport_factory, connection="RTL simulation"):
+    def __init__(self, root, transport_factory):
         self.root, self.factory = root, transport_factory
         self.board = [0] * 64
         self.status = None
@@ -79,62 +75,45 @@ class ChessWindow:
         families = tkfont.families(root)
         self.piece_font = "Segoe UI Symbol" if "Segoe UI Symbol" in families else "DejaVu Sans"
 
-        root.title("Hardware Chess")
+        root.title("Chess")
         root.configure(bg=BG)
-        root.geometry("980x760")
-        root.minsize(760, 600)
+        root.geometry("720x720")
+        root.minsize(360, 360)
         root.protocol("WM_DELETE_WINDOW", self.close)
         root.bind("<Escape>", lambda _event: self.clear_selection())
 
-        header = tk.Frame(root, bg=BG)
-        header.pack(fill="x", padx=30, pady=(24, 12))
-        tk.Label(header, text="HARDWARE CHESS", bg=BG, fg=TEXT,
-                 font=("Segoe UI", 21, "bold")).pack(anchor="w")
-        tk.Label(header, text="Kings & pawns  /  automatic queen promotion", bg=BG,
-                 fg=MUTED, font=("Segoe UI", 11)).pack(anchor="w", pady=(4, 0))
-
-        body = tk.Frame(root, bg=BG)
-        body.pack(fill="both", expand=True, padx=(14, 26), pady=(0, 18))
-        self.canvas = tk.Canvas(body, bg=BG, highlightthickness=0)
-        self.canvas.pack(side="left", fill="both", expand=True)
+        self.canvas = tk.Canvas(root, bg=BG, highlightthickness=0)
+        self.canvas.pack(fill="both", expand=True)
         self.canvas.bind("<Configure>", lambda _event: self.draw())
         self.canvas.bind("<ButtonPress-1>", self.on_press)
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
 
-        sidebar = tk.Frame(body, bg=PANEL, width=230)
-        sidebar.pack(side="right", fill="y", padx=(12, 0), pady=24)
-        sidebar.pack_propagate(False)
-        tk.Label(sidebar, text=connection, bg=PANEL, fg=ACCENT,
-                 font=("Segoe UI", 10, "bold"), wraplength=198).pack(anchor="w", padx=18, pady=(22, 20))
-        tk.Label(sidebar, text="YOU  ·  WHITE\nENGINE  ·  BLACK", justify="left",
-                 bg=PANEL, fg=TEXT, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=18)
-        self.message = tk.StringVar(value="Connecting…")
-        self.status_label = tk.Label(sidebar, textvariable=self.message, wraplength=194,
-            justify="left", bg=PANEL, fg=TEXT, font=("Segoe UI", 13, "bold"))
-        self.status_label.pack(fill="x", padx=18, pady=(26, 12))
-        self.detail = tk.StringVar(value="The same hardware engine as the CLI.")
-        tk.Label(sidebar, textvariable=self.detail, wraplength=194, justify="left",
-                 bg=PANEL, fg=MUTED, font=("Segoe UI", 10)).pack(fill="x", padx=18, pady=(0, 22))
-
-        self.new_button = self._button(sidebar, "New game", lambda: self.submit(1))
-        self.refresh_button = self._button(sidebar, "Refresh board", lambda: self.submit(2))
-        self.flip_button = self._button(sidebar, "Flip board", self.flip)
-        self.reconnect_button = self._button(sidebar, "Reconnect", self.reconnect)
-        tk.Label(sidebar, text="Click a white piece, then its destination.\n\nOr drag and drop.\n\nEsc clears selection.",
-                 wraplength=194, justify="left", bg=PANEL, fg=MUTED,
-                 font=("Segoe UI", 10)).pack(side="bottom", padx=18, pady=22)
+        # Keep the board unobstructed; occasional status goes in the window title.
+        self.message = tk.StringVar(value="")
+        self.message.trace_add("write", lambda *_: root.title(
+            "Chess" + (" — " + self.message.get() if self.message.get() else "")))
+        self.detail = tk.StringVar(value="")
+        self.menu = tk.Menu(root, tearoff=False)
+        self.menu.add_command(label="New game", command=lambda: self.submit(1))
+        self.menu.add_command(label="Refresh board", command=lambda: self.submit(2))
+        self.menu.add_command(label="Flip board", command=self.flip)
+        self.menu.add_command(label="Reconnect", command=self.reconnect)
+        self.menu.add_separator()
+        self.menu.add_command(label="Connection error…", command=lambda: messagebox.showerror(
+            "Connection error", self.detail.get(), parent=root))
+        self.canvas.bind("<Button-3>", self.show_menu)
 
         self.worker = EngineWorker(self.factory)
         self.submit(1, connecting=True)
-        root.after(40, self.poll)
+        self.poll_timer = root.after(40, self.poll)
+        self.reconnect_timer = None
 
-    def _button(self, parent, text, command):
-        button = tk.Button(parent, text=text, command=command, bg="#29434b", fg=TEXT,
-            activebackground="#385c63", activeforeground=TEXT, disabledforeground="#718b91",
-            relief="flat", bd=0, cursor="hand2", font=("Segoe UI", 11), pady=9)
-        button.pack(fill="x", padx=18, pady=4)
-        return button
+    def show_menu(self, event):
+        try:
+            self.menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.menu.grab_release()
 
     def layout(self):
         width, height = max(320, self.canvas.winfo_width()), max(320, self.canvas.winfo_height())
@@ -241,12 +220,13 @@ class ChessWindow:
         self.flipped = not self.flipped
         self.clear_selection()
 
-    def update_buttons(self):
+    def update_controls(self):
         ready = self.connected and not self.busy
-        for button in (self.new_button, self.refresh_button):
-            button.configure(state="normal" if ready else "disabled")
-        self.flip_button.configure(state="normal" if not self.busy else "disabled")
-        self.reconnect_button.configure(state="disabled" if self.reconnecting else "normal")
+        for label in ("New game", "Refresh board"):
+            self.menu.entryconfigure(label, state="normal" if ready else "disabled")
+        self.menu.entryconfigure("Flip board", state="normal" if not self.busy else "disabled")
+        self.menu.entryconfigure("Reconnect", state="disabled" if self.reconnecting else "normal")
+        self.menu.entryconfigure("Connection error…", state="normal" if self.detail.get() else "disabled")
 
     def submit(self, command, source=0, target=0, connecting=False):
         if self.closed or self.busy or (not connecting and not self.connected):
@@ -257,10 +237,7 @@ class ChessWindow:
         self.clear_selection()
         self.pending_move = (source, target) if command == 3 else None
         self.message.set({1: "Starting new game…", 2: "Reading board…", 3: "Engine thinking…"}[command])
-        self.status_label.configure(fg=TEXT)
-        if command == 3:
-            self.detail.set(f"{square_name(source)} → {square_name(target)}\nWaiting for the engine's reply.")
-        self.update_buttons()
+        self.update_controls()
         self.draw()
         self.worker.commands.put((command, source, target))
 
@@ -278,23 +255,17 @@ class ChessWindow:
                 if error:
                     self.connected = False
                     self.message.set("Connection interrupted")
-                    self.detail.set(error + "\n\nUse Reconnect to try again.")
-                    self.status_label.configure(fg="#f2b28d")
+                    self.detail.set(error + "\n\nRight-click the board and choose Reconnect to try again.")
                 else:
                     self.connected = True
                     self.status, board = response
                     self.changed = {n for n in range(64) if board[n] != self.board[n]} if command[0] == 3 else set()
                     self.board = list(board)
-                    self.message.set(STATUS[self.status])
-                    self.status_label.configure(fg="#f2b28d" if self.status in (5, 6) else TEXT)
-                    if command[0] == 3:
-                        self.detail.set("Move rejected; the board is unchanged." if self.status == 5 else
-                            f"Played {square_name(command[1])} → {square_name(command[2])}.\nHighlighted squares show what changed.")
-                    else:
-                        self.detail.set("Select a white piece to play." if self.status == 0 else "Choose New game to play again.")
-                self.update_buttons()
+                    self.message.set("" if self.status == 0 else STATUS[self.status])
+                    self.detail.set("")
+                self.update_controls()
                 self.draw()
-        self.root.after(40, self.poll)
+        self.poll_timer = self.root.after(40, self.poll)
 
     def reconnect(self):
         if self.closed or self.reconnecting:
@@ -305,14 +276,14 @@ class ChessWindow:
         self.clear_selection()
         self.message.set("Reconnecting…")
         self.worker.stop()
-        self.update_buttons()
-        self.root.after(150, self.finish_reconnect)
+        self.update_controls()
+        self.reconnect_timer = self.root.after(150, self.finish_reconnect)
 
     def finish_reconnect(self):
         if self.closed:
             return
         if self.worker.alive():
-            self.root.after(50, self.finish_reconnect)
+            self.reconnect_timer = self.root.after(50, self.finish_reconnect)
             return
         self.worker = EngineWorker(self.factory)
         self.reconnecting = self.busy = False
@@ -322,6 +293,9 @@ class ChessWindow:
         if self.closed:
             return
         self.closed = True
+        for timer in (self.poll_timer, self.reconnect_timer):
+            if timer is not None:
+                self.root.after_cancel(timer)
         self.worker.stop()
         self.root.destroy()
 
@@ -335,9 +309,8 @@ def main():
     parser.add_argument("--timeout", type=float, default=30)
     args = parser.parse_args()
     factory = (lambda: SerialTransport(args.port, args.baud, args.timeout)) if args.port else (lambda: SimulationTransport(args.timeout))
-    label = f"FPGA · {args.port}" if args.port else "RTL simulation"
     root = tk.Tk()
-    ChessWindow(root, factory, label)
+    ChessWindow(root, factory)
     root.mainloop()
 
 
