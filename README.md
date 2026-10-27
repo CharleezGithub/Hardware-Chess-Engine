@@ -31,6 +31,36 @@ Enter moves such as `e2e4` or `e2 e4`. Other commands: `board`, `new`, `quit`.
 Uppercase pieces are white, lowercase pieces are black. Illegal moves leave
 the board unchanged. After game over, enter `new` to restart.
 
+## Play with a visual board
+
+After the setup above, launch the Python window:
+
+```bash
+python chess_gui.py
+```
+
+Click a white piece and its destination, or drag and drop it. The engine plays
+black. The board highlights changed squares after each turn and reports illegal
+moves and game results. Use **New game**, **Refresh board**, **Flip board**, or
+**Reconnect** in the sidebar; Escape clears the selection.
+
+The window imports the existing CLI's transport from `UART.py`. All move
+validation, promotion, and engine play still run in the hardware RTL. Requests
+run in a background thread so the window stays responsive during a search.
+Simulation is the default; `--simulate` can also be supplied explicitly.
+
+To play on a programmed FPGA instead:
+
+```bash
+python chess_gui.py --port COM3
+```
+
+Close any CLI using that serial port first. Opening the window starts a new game.
+Reconnect reads the current FPGA board; reconnecting the local simulator starts
+a fresh simulation. The GUI uses Tkinter (included with standard Windows Python;
+on Linux, install your distribution's `python3-tk` package). No extra Python
+packages are required for the window.
+
 ## Play on Basys 3
 
 The native test command also generates `generated/fpga/Top.v`. In a shell with
@@ -74,6 +104,8 @@ This is the fast, bundled MVP check. It covers:
 - Real UART bits: framing, checksums, truncated-packet recovery and illegal moves.
 - Consecutive human/engine turns, both winners, stalemate, bare kings and reset.
 - The real Python client and terminal UI playing against the UART RTL simulator.
+- Visual-board clicks, dragging, connection recovery, and a full RTL engine turn
+  (GUI tests are skipped if no graphical display is available).
 
 `--skip-compile` reuses already emitted RTL and is only appropriate when it
 matches the current Scala sources. `sbt test` remains available for the older
