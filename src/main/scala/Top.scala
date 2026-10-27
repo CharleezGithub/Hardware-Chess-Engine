@@ -1,71 +1,44 @@
 import chisel3._
 import chisel3.util._
 
-class Top extends Module {
-  val io = IO(new Bundle {
-    // UART interface
-    val tx = Output(Bool())
-    val rx = Input(Bool())
+// The Basys wrapper supplies 20 MHz. Simulation uses a shorter UART bit period.
+class Top(clockFreq: Int = 20000000, baudRate: Int = 115200, maxDepth: Int = 2) extends Module {
+    val io = IO(new Bundle {
+        val tx = Output(Bool())
+        val rx = Input(Bool())
+        val led = Output(UInt(16.W))
+        val buttons = Input(UInt(5.W))
+    })
+    val game = Module(new GameController(maxDepth))
+    val uart = Module(new GameUart(clockFreq, baudRate))
+    uart.io.rx := io.rx
+    io.tx := uart.io.tx
 
-    // other hardware peripherals
-    val led = Output(UInt(16.W))
-    val buttons = Input(UInt(5.W))
-  })
+    val button = RegNext(RegNext(io.buttons(0), false.B), false.B)
+    val stable = RegInit(false.B)
+    val debounceCycles = clockFreq / 100
+    val count = RegInit(0.U(log2Ceil(debounceCycles + 1).W))
+    when(button =/= stable) {
+        when(count === (debounceCycles - 1).U) { stable := button; count := 0.U }
+            .otherwise { count := count + 1.U }
+    }.otherwise { count := 0.U }
+    val previous = RegNext(stable, false.B)
+    val resetPending = RegInit(false.B)
+    when(stable && !previous) { resetPending := true.B }
+    when(resetPending && game.io.commandReady) { resetPending := false.B }
 
-  // Instantiate the UART transmitter and chess board modules
-  val board = Module(new Board(depth = 2, color = true))
-
-  val updBoard = WireDefault(false.B)
-
-  board.io.updBoard := updBoard
-
-  val uart = Module(new UartTop(baudRate = 115200, clockFreq = 100000000)) 
-
-  // Hardware peripherals regs
-  val ledReg = RegInit(0.U(16.W))
-
-  // Connect the UART outputs to the top-level IO
-  io.led := ledReg
-  ledReg := uart.io.busy // Indicate UART busy state on LED 0
-  io.tx := uart.io.tx
-  uart.io.rx := io.rx
-
-  // Synchronize asynchronous button input to avoid metastability
-  val btnSync = RegNext(RegNext(io.buttons(0).asBool, false.B), false.B)
-
-  // Debounce counter and register
-  val btnDebounce = RegInit(false.B )
-  val debounceCounter = RegInit(0.U(20.W)) // 20-bit counter for debouncing
-  when (btnSync =/= btnDebounce) { // Check if the button state has changed
-    debounceCounter := debounceCounter + 1.U
-    when (debounceCounter === 1000000.U) { // Adjust the debounce time as needed
-      btnDebounce := btnSync
-      debounceCounter := 0.U
-    }
-  }.otherwise {
-    debounceCounter := 0.U
-  }
-  
-  val btnPrev = RegNext(btnDebounce, false.B)
-
-  uart.io.sendData := btnDebounce && !btnPrev // Use the debounced button signal to trigger data send
-  uart.io.board := board.io.board // Connect the chess board to UART for transmission
-
-  val newBoard = RegInit(false.B)
-  when (uart.io.boardValid || newBoard) { // When a new board is received via UART
-    newBoard := true.B // Set the flag to indicate a new board is available 
-    when(board.io.playerTurn) { // If it's player's turn, update the board
-      board.io.newBoard := uart.io.boardOut
-      newBoard := false.B // Reset the flag after updating the board
-      updBoard := true.B // Indicate that the board has been updated
-    }. otherwise {
-      board.io.newBoard := board.io.board // Keep the current board if it's not player's turn
-    }
-  }.otherwise {
-    board.io.newBoard := board.io.board 
-  }
+    game.io.commandValid := uart.io.commandValid || resetPending
+    game.io.command := Mux(resetPending, 1.U, uart.io.command)
+    game.io.from := Mux(resetPending, 0.U, uart.io.from)
+    game.io.to := Mux(resetPending, 0.U, uart.io.to)
+    uart.io.commandReady := game.io.commandReady && !resetPending
+    uart.io.responseValid := game.io.responseValid
+    game.io.responseReady := uart.io.responseReady
+    uart.io.responseStatus := game.io.responseStatus
+    uart.io.board := game.io.board
+    io.led := Cat(0.U(6.W), uart.io.busy, game.io.busy, 0.U(5.W), game.io.status)
 }
 
 object Top extends App {
-  emitVerilog(new Top)
+    emitVerilog(new Top, args)
 }

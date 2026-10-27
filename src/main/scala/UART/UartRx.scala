@@ -13,6 +13,7 @@ class UartRx(baudRate: Int, clockFreq: Int) extends Module {
 
     val bitCounter = RegInit(0.U(3.W))
     val dataReg = RegInit(0.U(8.W))
+    val rxSync = RegNext(RegNext(io.rx, true.B), true.B)
     
     val sIdle :: sStart :: sData :: sStop :: sDone :: Nil = Enum(5)
     val state = RegInit(sIdle)
@@ -23,7 +24,7 @@ class UartRx(baudRate: Int, clockFreq: Int) extends Module {
     
     switch(state) {
         is(sIdle) {
-            when (!io.rx) { // Start bit detected
+            when (!rxSync) { // Start bit detected
                 state := sStart
                 counter := 0.U
                 bitCounter := 0.U
@@ -31,7 +32,7 @@ class UartRx(baudRate: Int, clockFreq: Int) extends Module {
         }
         is(sStart) {
             when (counter === (countMID - 1).U) { // Wait for half a bit period
-                when (io.rx) { // If line is high, it's a false start
+                when (rxSync) { // If line is high, it's a false start
                     state := sIdle
                     counter := 0.U
                 }.otherwise {
@@ -45,7 +46,7 @@ class UartRx(baudRate: Int, clockFreq: Int) extends Module {
         is (sData) {
             when (counter === (countMax - 1).U) { // Wait for a full bit period
                 counter := 0.U
-                dataReg := Cat(io.rx, dataReg(7, 1))
+                dataReg := Cat(rxSync, dataReg(7, 1))
                 when (bitCounter === 7.U) { // If we've received 8 bits, go to stop bit
                     state := sStop
                     bitCounter := 0.U
@@ -58,7 +59,7 @@ class UartRx(baudRate: Int, clockFreq: Int) extends Module {
         }
         is (sStop) {
             when (counter === (countMax - 1).U) { // Wait for a full bit period
-                when(io.rx) { // Stop bit should be high
+                when(rxSync) { // Stop bit should be high
                     state := sDone
                 }.otherwise {
                     state := sIdle // If stop bit is low, go back to idle
