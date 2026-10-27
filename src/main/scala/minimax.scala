@@ -38,6 +38,7 @@ class minimax(maxDepth: Int) extends Module {
         val inCheck = Input(Bool())
 
         // Output til MoveGenerator
+        val moveRequest = Output(Bool())
         val moveBoard = Output(Vec(8, Vec(8, UInt(16.W))))
         val moveCursor = Output(UInt(13.W))
         val moveWhiteTurn = Output(Bool())
@@ -94,6 +95,9 @@ class minimax(maxDepth: Int) extends Module {
     val sIdle :: sInit :: sGetMove :: sMakeMove :: sEvaluate :: sBacktrack :: sUpdate :: sDone :: Nil = Enum(8)
 
     val state = RegInit(sIdle)
+
+    // The generator scans while we wait and holds its answer until we leave.
+    io.moveRequest := state === sGetMove
 
     switch(state) {
 
@@ -223,8 +227,13 @@ class minimax(maxDepth: Int) extends Module {
                 workingBoard(toRow)(toCol)
 
             // udfør move på workingBoard
-            workingBoard(toRow)(toCol) :=
-                workingBoard(fromRow)(fromCol)
+            // Automatically promote to a queen. movedPiece above keeps the
+            // original pawn, so backtracking restores it correctly.
+            val piece = workingBoard(fromRow)(fromCol)
+            val promotesWhite = piece === pieces.white_pawn && toRow === 0.U
+            val promotesBlack = piece === pieces.black_pawn && toRow === 7.U
+            workingBoard(toRow)(toCol) := Mux(promotesWhite, pieces.white_queen,
+                Mux(promotesBlack, pieces.black_queen, piece))
 
             workingBoard(fromRow)(fromCol) := 0.U
 
