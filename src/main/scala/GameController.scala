@@ -27,7 +27,7 @@ class GameController(maxDepth: Int = 2) extends Module {
         val status = Output(UInt(3.W))
         val busy = Output(Bool())
     })
-    val initialBoard = VecInit(ChessPosition.initial.map(row => VecInit(row.map(_.U(16.W)))))
+    val initialBoard = VecInit(ChessPosition.initial.map(row => VecInit(row.map(_.U(4.W)))))
     val board = RegInit(initialBoard)
     val gameStatus = RegInit(0.U(3.W))
     val replyStatus = RegInit(0.U(8.W))

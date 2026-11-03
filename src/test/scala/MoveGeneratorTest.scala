@@ -209,15 +209,15 @@ class MoveGeneratorTest extends AnyFlatSpec with ChiselScalatestTester {
 // Connect the real modules, without changing the existing UART-only Top.
 class KingPawnSearchHarness(depth: Int) extends Module {
     val io = IO(new Bundle {
-        val board = Input(Vec(8, Vec(8, UInt(16.W))))
+        val board = Input(Vec(8, Vec(8, UInt(4.W))))
         val whiteTurn = Input(Bool())
         val start = Input(Bool())
         val done = Output(Bool())
         val bestMove = Output(UInt(12.W))
         val bestScore = Output(SInt(32.W))
-        val workingBoard = Output(Vec(8, Vec(8, UInt(16.W))))
+        val workingBoard = Output(Vec(8, Vec(8, UInt(4.W))))
         val watchSquare = Input(UInt(6.W))
-        val watchPiece = Input(UInt(16.W))
+        val watchPiece = Input(UInt(4.W))
         val sawPiece = Output(Bool())
     })
     val search = Module(new minimax(depth))

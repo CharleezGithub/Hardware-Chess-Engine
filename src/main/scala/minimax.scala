@@ -12,8 +12,8 @@ class SearchReg extends Bundle {
 
     // info til at gå tilbage i træet
     val playedMove = UInt(12.W)
-    val movedPiece = UInt(16.W)
-    val capturedPiece = UInt(16.W)
+    val movedPiece = UInt(4.W)
+    val capturedPiece = UInt(4.W)
 
     val hasMove = Bool()
     val hasScored = Bool()
@@ -26,7 +26,7 @@ class minimax(maxDepth: Int) extends Module {
 
     val io = IO(new Bundle {
         // Inputs
-        val board = Input(Vec(8, Vec(8, UInt(16.W))))
+        val board = Input(Vec(8, Vec(8, UInt(4.W))))
         val start = Input(Bool())
         val isWhiteTurn = Input(Bool())
 
@@ -39,7 +39,7 @@ class minimax(maxDepth: Int) extends Module {
 
         // Output til MoveGenerator
         val moveRequest = Output(Bool())
-        val moveBoard = Output(Vec(8, Vec(8, UInt(16.W))))
+        val moveBoard = Output(Vec(8, Vec(8, UInt(4.W))))
         val moveCursor = Output(UInt(13.W))
         val moveWhiteTurn = Output(Bool())
 
@@ -64,7 +64,7 @@ class minimax(maxDepth: Int) extends Module {
     val whiteTurnReg = RegInit(true.B)
 
     // board der ændres under søgningen
-    val workingBoard = Reg(Vec(8, Vec(8, UInt(16.W))))
+    val workingBoard = Reg(Vec(8, Vec(8, UInt(4.W))))
 
     // gemmer det bedste resultat
     val bestMoveReg = RegInit(0.U(12.W))

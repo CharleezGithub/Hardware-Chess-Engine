@@ -78,6 +78,25 @@ module minimax_native_test;
     end
   endtask
 
+  task advancement_case(input bit white_side, input bit capture);
+    integer from_square, to_square;
+    begin
+      prepare;
+      whiteTurn = white_side;
+      board[63] = 6; // White king h1.
+      board[7] = 12; // Black king h8.
+      from_square = white_side ? 16 : 40; // a6 / a3.
+      to_square = (white_side ? 8 : 48) + capture; // a7 / a2, or capture on b-file.
+      board[from_square] = white_side ? 1 : 7;
+      if (capture) board[to_square] = white_side ? 7 : 1;
+      run_search;
+      if (bestMove !== ((from_square << 6) | to_square))
+        $fatal(1, "Pawn refused advancement white=%0d capture=%0d move=%0d score=%0d",
+          white_side, capture, bestMove, bestScore);
+      $display("PASS advancement white=%0d capture=%0d score=%0d", white_side, capture, bestScore);
+    end
+  endtask
+
   initial begin
     for (n = 0; n < 64; n = n + 1) board[n] = 0;
     repeat (3) tick;
@@ -96,6 +115,10 @@ module minimax_native_test;
     promotion_case(0, 0);
     promotion_case(1, 1);
     promotion_case(0, 1);
+    advancement_case(1, 0);
+    advancement_case(0, 0);
+    advancement_case(1, 1);
+    advancement_case(0, 1);
     prepare;
     whiteTurn = 0;
     board[0] = 12; board[9] = 5; board[18] = 6;

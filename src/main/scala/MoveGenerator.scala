@@ -8,7 +8,7 @@ class MoveGenerator extends Module {
         // Hold these inputs steady while request is high. Drop request after
         // accepting moveValid or moveFinished, before asking for another move.
         val request = Input(Bool())
-        val board = Input(Vec(8, Vec(8, UInt(16.W))))
+        val board = Input(Vec(8, Vec(8, UInt(4.W))))
         val whiteTurn = Input(Bool())
         val cursor = Input(UInt(13.W))
 
@@ -119,7 +119,7 @@ class MoveGenerator extends Module {
 
     // Try the candidate on a temporary board to check our king's safety.
     // Promotion does not change occupancy, so it does not affect this check.
-    val afterMove = Wire(Vec(8, Vec(8, UInt(16.W))))
+    val afterMove = Wire(Vec(8, Vec(8, UInt(4.W))))
     afterMove := io.board
     afterMove(fromRow)(fromCol) := 0.U
     afterMove(toRow)(toCol) := movingPiece
