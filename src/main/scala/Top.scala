@@ -11,7 +11,7 @@ class Top(clockFreq: Int = 20000000, baudRate: Int = 115200, maxDepth: Int = 3)
     val buttons = Input(UInt(5.W))
   })
   val game = Module(new GameController(maxDepth))
-  val uart = Module(new GameUart(clockFreq, baudRate))
+  val uart = Module(new UartTop(baudRate, clockFreq))
   uart.io.rx := io.rx
   io.tx := uart.io.tx
 

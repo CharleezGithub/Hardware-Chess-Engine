@@ -6,6 +6,7 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
     val io = IO(new Bundle {
         val tx = Output(Bool())
         val busy = Output(Bool()) // State of the UART transmitter
+        val responseStatus = Input(UInt(8.W)) // 0 = white to move, 2 = white wins, 3 = black wins, 4 = draw, 5 = illegal move, 6 = bad command/frame
         val board = Input(Vec(8, Vec(8, UInt(4.W)))) // 8x8 chess board input to be printed
         val sendData = Input(Bool())
     })
@@ -13,8 +14,9 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
     val countMax = (clockFreq / baudRate)
     val cnt = RegInit(0.U(log2Ceil(countMax + 1).W))
     val dataBoard = RegInit(VecInit(Seq.fill(8)(VecInit(Seq.fill(8)(0.U(4.W))))))
-    
-    val byteIndex = RegInit(0.U(5.W)) // 8x8 board, half a byte per square
+    val dataStatus = RegInit(0.U(8.W))
+
+    val byteIndex = RegInit(0.U(6.W)) // 8x8 board, half a byte per square
     val bitCnt = RegInit(0.U(3.W)) // Uart transmits a byte at a time, so we need to count up to 8
 
     
@@ -22,13 +24,19 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
     val state = RegInit(sIdle)
 
     val currentByte = Cat(dataBoard(byteIndex(4, 2))(byteIndex(1, 0) << 1), dataBoard(byteIndex(4, 2))((byteIndex(1, 0) << 1) + 1.U)) // Concatenate the two squares to form a byte
-    io.tx := true.B // idle state is high
+    val currentByteWithStatus = Mux(byteIndex === 32.U, dataStatus, currentByte) // If we are at the last byte, send the status instead of board data
+
+    val txReg = RegInit(true.B) // UART idle state is high
+
+    io.tx := txReg
     io.busy := (state =/= sIdle)
 
     switch(state) {
         is(sIdle) {
+            txReg := true.B
             when(io.sendData) {
                 dataBoard := io.board // Latch the board data when sendData is high
+                dataStatus := io.responseStatus // Latch the response status when sendData is high
                 byteIndex := 0.U
                 bitCnt := 0.U
                 cnt := 0.U
@@ -36,7 +44,7 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
             }
         }
         is(sStart) {
-            io.tx := false.B // start bit is low
+            txReg := false.B // start bit is low
             when(cnt === (countMax - 1).U) { // stall for one baud period
                 cnt := 0.U
                 bitCnt := 0.U
@@ -47,7 +55,7 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
 
         }
         is(sData) { // send 8 x 8 board pieces as data
-            io.tx := currentByte(bitCnt) 
+            txReg := currentByteWithStatus(bitCnt) 
             when(cnt === (countMax - 1).U) {
                 cnt := 0.U
                 when(bitCnt === 7.U) {
@@ -60,10 +68,10 @@ class UartTx(baudRate: Int, clockFreq: Int) extends Module {
             }
         }
         is(sStop) {
-            io.tx := true.B // stop bit is high
+            txReg := true.B // stop bit is high
             when(cnt === (countMax - 1).U) {
                 cnt := 0.U 
-                when(byteIndex === 31.U) { // 8 * 8 board, half a byte per square, so 32 bytes total
+                when(byteIndex === 32.U) { // 8 * 8 board, half a byte per square, so 32 bytes total
                     state := sIdle
                 }.otherwise {
                     byteIndex := byteIndex + 1.U

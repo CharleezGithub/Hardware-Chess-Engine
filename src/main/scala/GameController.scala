@@ -22,7 +22,7 @@ class GameController(maxDepth: Int = 2) extends Module {
         val to = Input(UInt(8.W))
         val responseValid = Output(Bool())
         val responseReady = Input(Bool())
-        val responseStatus = Output(UInt(8.W))
+        val responseStatus = Output(UInt(8.W)) // 0 = white to move, 2 = white wins, 3 = black wins, 4 = draw, 5 = illegal move, 6 = bad command/frame
         val board = Output(Vec(8, Vec(8, UInt(4.W))))
         val status = Output(UInt(3.W))
         val busy = Output(Bool())
@@ -85,8 +85,17 @@ class GameController(maxDepth: Int = 2) extends Module {
                             }.otherwise { replyStatus := 5.U }
                         }
                     }
+                    is(4.U) { // Set piece command
+                        when(io.from < 64.U && io.to < 16.U) { // Validate input
+                            val row = io.from(5, 3)
+                            val col = io.from(2, 0)
+                            board(row)(col) := io.to(3, 0)
+                            replyStatus := 0.U // Make sure the turn doesn't change when setting pieces
+                        }.otherwise { replyStatus := 5.U } // Illegal input
+
+                    }
                 }
-                when(io.command =/= 1.U && io.command =/= 2.U && io.command =/= 3.U) {
+                when(io.command > 4.U || io.command === 0.U) { // Catch bad commands >:(
                     replyStatus := 6.U
                 }
             }

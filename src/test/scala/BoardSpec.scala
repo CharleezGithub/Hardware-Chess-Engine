@@ -17,6 +17,7 @@ class BoardSpec extends AnyFlatSpec with ChiselScalatestTester {
             Seq(0, 0, 0, 0, 0, 0, 0, 0),
             Seq(0, 0, 0, 0, 0, 0, 0, 0)
         )
+        
         // Check that the board is initialized to all zeros
         for (r <- 0 until 8; c <- 0 until 8) {
             // print(initBoard(r)(c))

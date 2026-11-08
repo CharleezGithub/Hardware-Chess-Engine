@@ -22,10 +22,11 @@ class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.sendData.poke(true.B)
         dut.clock.step(1)
         dut.io.sendData.poke(false.B)
+        dut.io.responseStatus.poke(0.U) // Set response status to 0 for this test
         dut.clock.setTimeout(100000) // Set a timeout to avoid infinite loops in case of failure
         val countMax = (1000000 / 115200)
         var cnt = 0
-        val totalBits = 8 * 8 * 0.5 // 8x8 board half a byte per square
+        val totalBits = 8 * 8 * 0.5 + 1 // 8x8 board half a byte per square + response status byte
         // loop through the test board
         for (r <- 0 until 8; c <- 0 until 4) {
             val squareVal1 = testBoard(r)(c*2)
@@ -40,15 +41,33 @@ class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
                 // Data bits
             for (i <- 0 until 8) { // Only 4 bits for each square
                 val expectedBit = (byte >> i) & 1
+                println(s"Sending byte: ${byte.toHexString}, bit $i: $expectedBit")
+                println(s"TX line: ${dut.io.tx.peek().litValue}")
                 dut.io.tx.expect((expectedBit == 1).B)
                 dut.clock.step(countMax)
             }
-    
-                // Stop bit
+            // Stop bit
             dut.io.tx.expect(true.B)
             dut.clock.step(countMax)
             
         }
+        // After sending all board bytes, send the response status byte
+        while (dut.io.tx.peek().litToBoolean) { // trap until tx goes low
+            dut.clock.step(1)
+        }
+        dut.clock.step(countMax) // Wait for the duration of one baud period
+        for (i <- 0 until 8) {
+            val responseStatusByte = dut.io.responseStatus.peek()
+            val expectedBit = (responseStatusByte.litValue >> i) & 1
+            println(s"Sending response status byte: ${responseStatusByte.litValue.toString}, bit $i: $expectedBit")
+            println(s"TX line: ${dut.io.tx.peek().litValue}")
+            dut.io.tx.expect((expectedBit == 1).B)
+            dut.clock.step(countMax)
+        }
+        // Stop bit for response status byte
+        dut.io.tx.expect(true.B)
+        dut.clock.step(countMax)
+
         dut.io.busy.expect(false.B) // Ensure busy is false after sending all bytes
     }
   }

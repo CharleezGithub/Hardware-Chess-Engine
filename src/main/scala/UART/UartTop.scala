@@ -7,41 +7,90 @@ class UartTop(baudRate: Int, clockFreq: Int) extends Module {
         val tx = Output(Bool())
         val rx = Input(Bool())
 
+        // Tx inputs
         val board = Input(Vec(8, Vec(8, UInt(4.W)))) // 8x8 chess board input to be printed
-        val sendData = Input(Bool())
+        val responseValid = Input(Bool())
 
+        // Rx inputs
+        val commandReady = Input(Bool())
+        val responseStatus = Input(UInt(8.W))
+
+        // Tx outputs
         val busy = Output(Bool()) // State of the UART transmitter
-        val boardOut = Output(Vec(8, Vec(8, UInt(4.W)))) // 8x8 chess board output received from UART
-        val boardValid = Output(Bool()) // Indicates when a new board has been received
+        
+        // Rx outputs
+        val commandValid = Output(Bool())
+        val command = Output(UInt(8.W))
+        val from = Output(UInt(8.W))
+        val to = Output(UInt(8.W))
+        val outputValid = Output(Bool())
+        val responseReady = Output(Bool())
     })
+
     // Uart Tx
     val uartTx = Module(new UartTx(baudRate, clockFreq))
     io.tx := uartTx.io.tx
-    uartTx.io.sendData := io.sendData
+    uartTx.io.sendData := io.responseValid
+
     when(uartTx.io.busy) {
         uartTx.io.sendData := false.B // Prevent sending new data while busy
     }
     io.busy := uartTx.io.busy
     uartTx.io.board := io.board
+    io.responseReady := !uartTx.io.busy // Ready to receive response when not sending data
+    uartTx.io.responseStatus := io.responseStatus
+
 
     // Uart Rx
     val uartRx = Module(new UartRx(baudRate, clockFreq))
     uartRx.io.rx := io.rx
 
-    val boardData = RegInit(VecInit(Seq.fill(8)(VecInit(Seq.fill(8)(0.U(4.W))))))
-    val byteIndex = RegInit(0.U(5.W)) // 8x8 board, half a byte per square
+    val command = RegInit(0.U(8.W))
+    val pending = RegInit(false.B)
+    val receiveIndex = RegInit(0.U(3.W))
+    val timeoutCycles = clockFreq / 10
+    val timeout = RegInit(0.U(log2Ceil(timeoutCycles + 1).W))
+    val from = RegInit(0.U(8.W))
+    val to = RegInit(0.U(8.W))
 
-    when(uartRx.io.dataValid) { // Format the received byte into two squares on the board
-        boardData(byteIndex(4, 2))(byteIndex(1, 0) << 1) := uartRx.io.dataOut(7, 4) // High nibble to first square
-        boardData(byteIndex(4, 2))((byteIndex(1, 0) << 1) + 1.U) := uartRx.io.dataOut(3, 0) // Low nibble to second square
+    when(pending && io.commandReady) { pending := false.B }
+    when(receiveIndex =/= 0.U) {
+        timeout := timeout + 1.U
+        when(timeout === (timeoutCycles - 1).U) { receiveIndex := 0.U; timeout := 0.U }
+    }
 
-        when(byteIndex === 31.U) { // If we've filled the entire board
-            byteIndex := 0.U // Reset for next board
-        }.otherwise {
-            byteIndex := byteIndex + 1.U // Move to next square
+    when(uartRx.io.dataValid && !pending) { // Format the received byte into two squares on the board
+        timeout := 0.U
+        switch(receiveIndex) {
+            is(0.U) { 
+                when(uartRx.io.dataOut === 0xFF.U) { 
+                    receiveIndex := 1.U 
+                } 
+            }
+            is(1.U) { 
+                command := uartRx.io.dataOut
+                receiveIndex := 2.U 
+            }
+            is(2.U) {
+                from := uartRx.io.dataOut
+                receiveIndex := 3.U
+            }
+            is(3.U) {
+                to := uartRx.io.dataOut
+                receiveIndex := 4.U
+            }
+            is(4.U) {
+                when(uartRx.io.dataOut =/= (command ^ from ^ to)) { // Checksum validation
+                    command := 255.U
+                }
+                pending := true.B
+                receiveIndex := 0.U
+            }
         }
     }
-    val boardValReg = RegNext(byteIndex === 31.U && uartRx.io.dataValid, false.B) // Register to hold the board valid signal for one cycle
-    io.boardValid := boardValReg // Indicate when a full board has been received
-    io.boardOut := boardData
+    io.commandValid := pending
+    io.outputValid := uartRx.io.dataValid
+    io.command := command
+    io.from := from
+    io.to := to
 }
