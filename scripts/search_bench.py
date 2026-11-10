@@ -16,10 +16,10 @@ module minimax_native_test;
   reg reset = 1;
   reg start = 0;
   reg whiteTurn = 1;
-  reg [15:0] board [0:63];
-  wire [15:0] workingBoard [0:63];
+  reg [3:0] board [0:63];
+  wire [3:0] workingBoard [0:63];
   reg [5:0] watchSquare = 0;
-  reg [15:0] watchPiece = 0;
+  reg [3:0] watchPiece = 0;
   wire sawPiece, done;
   wire [11:0] bestMove;
   wire signed [31:0] bestScore;
@@ -44,7 +44,7 @@ module minimax_native_test;
       start = 1;
       cycles = 0;
       tick;
-      while (!done && cycles < 20000) begin
+      while (!done && cycles < 200000) begin
         tick;
         cycles = cycles + 1;
       end
@@ -130,6 +130,27 @@ module minimax_native_test;
     run_search;
     if (bestMove !== 0 || bestScore !== 0) $fatal(1, "Stalemate result incorrect");
     $display("PASS stalemate cycles=%0d", cycles);
+    // Every added piece can capture and is restored after search, including
+    // the captured piece. The queen is undefended and worth more than any
+    // positional bonus. Mirror each case to exercise black as well.
+    for(integer side=0; side<2; side=side+1) begin
+      for(integer kind=2; kind<=4; kind=kind+1) begin
+        prepare;
+        whiteTurn = !side;
+        board[63] = 6; board[7] = 12;
+        board[side ? 28 : 35] = kind + (side ? 6 : 0);
+        if(kind==2) n = 17; // Bishop d4-b6.
+        else if(kind==3) n = 18; // Knight d4-c6.
+        else n = 19; // Rook d4-d6.
+        if(side) n = 63-n;
+        board[n] = side ? 5 : 11;
+        watchSquare = n; watchPiece = kind + (side ? 6 : 0);
+        run_search;
+        if(!sawPiece || bestMove !== (((side ? 28 : 35) << 6) | watchSquare))
+          $fatal(1, "New piece failed capture kind=%0d side=%0d move=%0d",kind,side,bestMove);
+      end
+    end
+    $display("PASS bishop, knight and rook captures and undo for both colors");
     $display("ALL NATIVE INTEGRATION CHECKS PASSED");
     $finish;
   end

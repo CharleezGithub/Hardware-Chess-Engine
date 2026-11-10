@@ -3,6 +3,27 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
 class EvalSpec extends AnyFlatSpec with ChiselScalatestTester {
+    "Full-piece evaluation" should "use the board piece IDs and mirror black's tables" in {
+        test(new MatrixBuffer8x8()) { dut =>
+            for (row <- 0 until 8; col <- 0 until 8)
+                dut.io.boardState(row)(col).poke(0.U)
+            // At d6: bishop bonus 10, knight bonus 15, rook bonus 0.
+            // At d7: the rook gets its seventh-rank bonus of 10.
+            for ((piece, row, col, expected) <- Seq(
+                (2, 2, 3, 340), (3, 2, 3, 335), (4, 1, 3, 510))) {
+                dut.io.boardState(row)(col).poke(piece.U)
+                dut.io.score.expect(expected.S)
+                dut.io.boardState(row)(col).poke(0.U)
+                dut.io.boardState(7 - row)(col).poke((piece + 6).U)
+                dut.io.score.expect((-expected).S)
+                dut.io.boardState(7 - row)(col).poke(0.U)
+            }
+            for (row <- 0 until 8; col <- 0 until 8)
+                dut.io.boardState(row)(col).poke(ChessPosition.initial(row)(col).U)
+            dut.io.score.expect(0.S)
+        }
+    }
+
     "Pawn evaluation" should "preserve material and advancement bonuses for both colors" in {
         test(new MatrixBuffer8x8()) { dut =>
             val bonuses = Seq(

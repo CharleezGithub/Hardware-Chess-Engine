@@ -1,13 +1,15 @@
-# Hardware chess MVP
+# Hardware chess engine
 
-A playable king-and-pawn game: human plays white, the FPGA plays black with a
-depth-2 minimax search. Each side starts with a king and eight pawns. Pawns
-automatically promote to queens, and promoted queens can move and give check.
+Human plays white and the engine plays black from the standard 32-piece
+starting position. All six piece types can move, capture and give check. The
+FPGA uses depth-3 minimax; local RTL simulation uses depth 1 to keep full-board
+searches responsive. Pawns automatically promote to queens.
 
 The hardware owns the board and validates every human move. It handles pawn
-single/double moves and captures, king safety, checkmate, stalemate, bare-king
-draws, promotion, and new games. Castling, en passant, underpromotion,
-repetition and the fifty-move rule are outside this MVP.
+single/double moves and captures, knight jumps, bishop/rook/queen sliding moves
+with blockers, king safety, checkmate, stalemate, bare-king draws, promotion,
+and new games. Castling, en passant, underpromotion, repetition and the
+fifty-move rule remain outside the current implementation.
 
 ## Play locally against the actual RTL
 
@@ -46,7 +48,9 @@ moves and game results in the window title. Right-click the board for **New game
 The window shows only the board and coordinates. UART does not currently send
 an evaluation score, so no score is displayed.
 
-The window imports the existing CLI's transport from `UART.py`. All move
+The window imports the shared transport interface from `UART.py`, backed by
+`engine_transport.py`. Running `UART.py` without arguments retains the serial
+CLI and its custom-board loading helpers. All move
 validation, promotion, and engine play still run in the hardware RTL. Requests
 run in a background thread so the window stays responsive during a search.
 Simulation is the default; `--simulate` can also be supplied explicitly.
@@ -118,13 +122,14 @@ searches; use the native runner for routine MVP verification.
 
 `GameController.scala` owns the committed board, validates white moves, runs
 black's search, applies the chosen move and reports the game state. It shares
-one `MoveGenerator` with minimax. `Top.scala` connects the controller and framed
-UART transport. The old `Board`/`UartTop` modules remain as standalone exercises;
-they are not used in the playable top.
+one `MoveGenerator` with minimax. `Top.scala` connects the controller and
+UART transport. `UartTop` handles the current serial protocol. The old `Board`
+module remains a standalone exercise and is not used in the playable top.
 
 Squares use row order: `0 = a8`, `7 = h8`, `56 = a1`, `63 = h1`.
-Piece IDs are `0` empty; `1/5/6` white pawn/queen/king; `7/11/12` black
-pawn/queen/king. UART uses four bits per square; the search interface uses 16.
+Piece IDs are `0` empty; `1/2/3/4/5/6` white pawn/bishop/knight/rook/queen/king;
+`7/8/9/10/11/12` the corresponding black pieces. UART and search use four bits
+per square.
 A move is `(fromSquare << 6) | toSquare`, a 12-bit unsigned number.
 
 The generator's 13-bit cursor is a bookmark among 4096 candidate from/to pairs.
@@ -139,16 +144,18 @@ UART uses stop-and-wait requests. Send one packet, then read its reply before
 sending another. A packet interrupted for 100 ms is discarded.
 
 ```text
-Request (5 bytes):  AA command from to checksum
-  command: 01 new game, 02 read board, 03 move
+Request (5 bytes):  FF command from to checksum
+  command: 01 new game, 02 read board, 03 move, 04 set square
+  set square: from = square index, to = piece ID
   checksum: command XOR from XOR to
 
-Reply (35 bytes):   55 status board[32] checksum
+Reply (33 bytes):   board[32] status
   each board byte packs two squares: earlier square in the high nibble
-  checksum: XOR of status and all 32 board bytes
   status: 00 white to move, 02 white wins, 03 black wins, 04 draw,
           05 illegal move, 06 invalid command/checksum
 ```
+
+Replies have no header or checksum; keep serial requests and replies aligned.
 
 Both sides apply promotion automatically; there is no promotion-choice field.
 The reply after a legal human move contains the board after the engine's reply,

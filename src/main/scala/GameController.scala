@@ -5,8 +5,8 @@ object ChessPosition {
     // a8 = 0, h1 = 63. Human is white; engine is black.
     val initial: Seq[Seq[Int]] = Seq.tabulate(8, 8) { (row, col) =>
         if (row == 1) 7 else if (row == 6) 1
-        else if (row == 0 && col == 4) 12
-        else if (row == 7 && col == 4) 6 else 0
+        else if (row == 0) Seq(10, 9, 8, 11, 12, 8, 9, 10)(col)
+        else if (row == 7) Seq(4, 3, 2, 5, 6, 2, 3, 4)(col) else 0
     }
 }
 

@@ -12,18 +12,15 @@ from move_bench import legal_moves
 
 def initial_board():
     board = [0] * 64
-    board[4], board[60] = 12, 6
+    board[:8] = [10, 9, 8, 11, 12, 8, 9, 10]
+    board[56:] = [4, 3, 2, 5, 6, 2, 3, 4]
     board[8:16] = [7] * 8
     board[48:56] = [1] * 8
     return board
 
 
 def response_frame(board, status=0):
-    payload = bytes([status] + [(board[n] << 4) | board[n + 1] for n in range(0, 64, 2)])
-    checksum = 0
-    for byte in payload:
-        checksum ^= byte
-    return bytes([0x55]) + payload + bytes([checksum])
+    return bytes([(board[n] << 4) | board[n + 1] for n in range(0, 64, 2)] + [status])
 
 
 def play(board, move):
@@ -45,21 +42,23 @@ class ProtocolTests(unittest.TestCase):
                 UART.parse_move(text)
 
     def test_frames_and_corruption(self):
-        self.assertEqual(UART.command_frame(3, 52, 36), bytes([170, 3, 52, 36, 19]))
+        self.assertEqual(UART.command_frame(3, 52, 36), bytes([255, 3, 52, 36, 19]))
         frame = response_frame(initial_board())
         self.assertEqual(UART.decode_response(frame), (0, initial_board()))
         with self.assertRaises(ValueError):
-            UART.decode_response(frame[:-1] + bytes([frame[-1] ^ 1]))
+            UART.decode_response(frame[:-1] + bytes([255]))
         with self.assertRaises(ValueError):
             UART.decode_response(frame[:-1])
+        invalid_piece = bytes([0xD0]) + frame[1:]
+        with self.assertRaises(ValueError):
+            UART.decode_response(invalid_piece)
 
-    def test_serial_receiver_resynchronizes(self):
+    def test_serial_receiver_reads_partial_reply(self):
         good = response_frame(initial_board())
-        broken = good[:-1] + bytes([good[-1] ^ 1])
 
         class FakePort:
             def __init__(self):
-                self.data = bytearray(b"noise" + broken + good)
+                self.data = bytearray(good)
                 self.sent = None
             @property
             def in_waiting(self):

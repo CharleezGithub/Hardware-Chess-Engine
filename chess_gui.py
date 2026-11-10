@@ -7,8 +7,9 @@ from tkinter import font as tkfont, messagebox
 
 from UART import SerialTransport, SimulationTransport, STATUS, command_frame
 
-WHITE = (1, 5, 6)
-GLYPHS = {1: "♟", 5: "♛", 6: "♚", 7: "♟", 11: "♛", 12: "♚"}
+WHITE = (1, 2, 3, 4, 5, 6)
+GLYPHS = {1: '♟', 2: '♝', 3: '♞', 4: '♜', 5: '♛', 6: '♚',
+          7: '♟', 8: '♝', 9: '♞', 10: '♜', 11: '♛', 12: '♚'}
 BG, MUTED = "#112128", "#a7bbc0"
 LIGHT, DARK = "#e7e4d1", "#729286"
 

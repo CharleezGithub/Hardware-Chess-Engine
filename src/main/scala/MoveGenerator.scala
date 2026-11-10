@@ -1,7 +1,7 @@
 import chisel3._
 import chisel3.util._
 
-// Kings, pawns and queens (needed after automatic pawn promotion).
+// Legal moves and king safety for all six piece types.
 // Square 0 is a8; white pawns move towards row 0, black towards row 7.
 class MoveGenerator extends Module {
     val io = IO(new Bundle {
@@ -21,9 +21,15 @@ class MoveGenerator extends Module {
 
     val ownPawn = Mux(io.whiteTurn, pieces.white_pawn, pieces.black_pawn)
     val ownKing = Mux(io.whiteTurn, pieces.white_king, pieces.black_king)
+    val ownBishop = Mux(io.whiteTurn, pieces.white_bishop, pieces.black_bishop)
+    val ownKnight = Mux(io.whiteTurn, pieces.white_knight, pieces.black_knight)
+    val ownRook = Mux(io.whiteTurn, pieces.white_rook, pieces.black_rook)
     val ownQueen = Mux(io.whiteTurn, pieces.white_queen, pieces.black_queen)
     val enemyPawn = Mux(io.whiteTurn, pieces.black_pawn, pieces.white_pawn)
     val enemyKing = Mux(io.whiteTurn, pieces.black_king, pieces.white_king)
+    val enemyBishop = Mux(io.whiteTurn, pieces.black_bishop, pieces.white_bishop)
+    val enemyKnight = Mux(io.whiteTurn, pieces.black_knight, pieces.white_knight)
+    val enemyRook = Mux(io.whiteTurn, pieces.black_rook, pieces.white_rook)
     val enemyQueen = Mux(io.whiteTurn, pieces.black_queen, pieces.white_queen)
 
     // One bit per square: bit n is true if square n contains this piece.
@@ -80,14 +86,23 @@ class MoveGenerator extends Module {
         val col = (fromCol.zext + colStep * distance.S).asUInt
         distance.U >= moveDistance || emptySquares(Cat(row(2, 0), col(2, 0)))
     }.reduce(_ && _)
-    val queenMove = movingPiece === ownQueen && pathClear &&
-        (rowDifference === 0.S || colDifference === 0.S || rowDistance === colDistance)
+    val straight = rowDifference === 0.S || colDifference === 0.S
+    val diagonal = rowDistance === colDistance
+    val queenMove = movingPiece === ownQueen && pathClear && (straight || diagonal)
+    val rookMove = movingPiece === ownRook && pathClear && straight
+    val bishopMove = movingPiece === ownBishop && pathClear && diagonal
+    val knightMove = movingPiece === ownKnight &&
+        ((rowDistance === 1.U && colDistance === 2.U) ||
+         (rowDistance === 2.U && colDistance === 1.U))
 
     // Look outwards from the king in eight directions. The first piece on a
     // ray can attack; pieces behind it cannot. Pawns and kings attack nearby.
     def kingAttacked(board: Vec[Vec[UInt]], square: UInt): Bool = {
         val empty = squaresContaining(board, 0.U)
         val queens = squaresContaining(board, enemyQueen)
+        val rooks = squaresContaining(board, enemyRook)
+        val bishops = squaresContaining(board, enemyBishop)
+        val knights = squaresContaining(board, enemyKnight)
         val kings = squaresContaining(board, enemyKing)
         val pawns = squaresContaining(board, enemyPawn)
         val directions = Seq((-1, -1), (-1, 0), (-1, 1), (0, -1),
@@ -104,12 +119,20 @@ class MoveGenerator extends Module {
                 val nearbyAttack = if (distance == 1)
                     kings(target) || (pawns(target) && pawnDirection)
                     else false.B
-                val attack = inside && clear && (queens(target) || nearbyAttack)
+                val slider = if (dr == 0 || dc == 0) rooks(target) else bishops(target)
+                val attack = inside && clear && (queens(target) || slider || nearbyAttack)
                 clear = clear && inside && empty(target)
                 attack
             }
         }
-        attacks.reduce(_ || _)
+        val knightAttacks = Seq((-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                                (1, -2), (1, 2), (2, -1), (2, 1)).map { case (dr, dc) =>
+            val row = square(5, 3).zext + dr.S(5.W)
+            val col = square(2, 0).zext + dc.S(5.W)
+            val inside = row >= 0.S && row < 8.S && col >= 0.S && col < 8.S
+            inside && knights(Cat(row.asUInt(2, 0), col.asUInt(2, 0)))
+        }
+        (attacks ++ knightAttacks).reduce(_ || _)
     }
 
     val kingSquares = squaresContaining(io.board, ownKing)
@@ -125,7 +148,7 @@ class MoveGenerator extends Module {
     afterMove(toRow)(toCol) := movingPiece
     val kingAfterMove = Mux(movingPiece === ownKing, toSquare, kingSquare)
     val legalMove = fromSquare =/= toSquare && canLand &&
-        (kingMove || pawnMove || queenMove) && kingPresent &&
+        (kingMove || pawnMove || queenMove || rookMove || bishopMove || knightMove) && kingPresent &&
         !kingAttacked(afterMove, kingAfterMove)
 
     val sIdle :: sScan :: sResult :: Nil = Enum(3)
@@ -143,7 +166,8 @@ class MoveGenerator extends Module {
             is(sScan) {
                 when(finished || legalMove) {
                     state := sResult
-                }.elsewhen(movingPiece =/= ownPawn && movingPiece =/= ownKing && movingPiece =/= ownQueen) {
+                }.elsewhen(!Mux(io.whiteTurn, movingPiece >= pieces.white_pawn && movingPiece <= pieces.white_king,
+                    movingPiece >= pieces.black_pawn && movingPiece <= pieces.black_king)) {
                     // No move can start here; skip all destinations for this square.
                     candidate := (fromSquare +& 1.U) << 6
                 }.otherwise {

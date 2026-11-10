@@ -4,7 +4,7 @@ import random
 
 
 def color(piece):
-    return piece in (1, 5, 6)
+    return 1 <= piece <= 6
 
 
 def reaches(board, source, target, attack=False):
@@ -25,7 +25,11 @@ def reaches(board, source, target, attack=False):
             return dr == direction or (row == (6 if color(piece) else 1) and
                 dr == 2 * direction and board[source + direction * 8] == 0)
         return dr == direction and abs(dc) == 1 and board[target] != 0
-    if kind == 5 and (dr == 0 or dc == 0 or abs(dr) == abs(dc)):
+    if kind == 3:
+        return sorted((abs(dr), abs(dc))) == [1, 2]
+    straight, diagonal = dr == 0 or dc == 0, abs(dr) == abs(dc)
+    if (kind == 5 and (straight or diagonal) or
+            kind == 4 and straight or kind == 2 and diagonal):
         rs, cs = (dr > 0) - (dr < 0), (dc > 0) - (dc < 0)
         return all(board[(row + step * rs) * 8 + col + step * cs] == 0
                    for step in range(1, max(abs(dr), abs(dc))))
@@ -66,7 +70,7 @@ def generate():
 module move_test;
 reg clock=0, reset=1, request=0, white=1;
 always #5 clock=~clock;
-reg [15:0] board[0:63];
+reg [3:0] board[0:63];
 reg [12:0] cursor=0;
 wire valid, finished, in_check;
 wire [11:0] move;
@@ -94,17 +98,32 @@ repeat(3) tick;
                 {60: 6, 0: 12, 4: 11, 52: 1, 43: 7},
                 {0: 12, 9: 5, 18: 6}, {0: 12, 17: 5, 18: 6},
                 {63: 6, 7: 12, 8: 1, 1: 11}, {63: 6, 7: 12, 48: 7, 57: 5}]
+    # Full opening, blocked sliders, pins, discovered checks, knight checks,
+    # and edge squares. Mirror every fixture to cover both colors equally.
+    opening = [10, 9, 8, 11, 12, 8, 9, 10] + [7] * 8 + [0] * 32 + [1] * 8 + [4, 3, 2, 5, 6, 2, 3, 4]
+    assert len(legal_moves(opening, True)) == len(legal_moves(opening, False)) == 20
+    fixtures += [dict(enumerate(opening)),
+        {60: 6, 4: 12, 35: 4, 19: 1, 37: 7, 33: 7, 51: 1},
+        {60: 6, 4: 12, 35: 2, 17: 1, 21: 7, 49: 7, 53: 1},
+        {60: 6, 4: 12, 35: 3, 18: 1, 20: 7, 25: 7, 29: 1},
+        {60: 6, 0: 12, 4: 10, 52: 4},
+        {63: 6, 0: 12, 9: 8, 54: 2},
+        {60: 6, 0: 12, 43: 9, 52: 4},
+        {56: 6, 7: 12, 63: 3, 8: 9},
+        {60: 6, 4: 12, 35: 3, 34: 1, 36: 1, 27: 1, 43: 1}]
     rng = random.Random(7301)
-    for _ in range(10):
-        cells = rng.sample(range(64), 6)
+    for _ in range(24):
+        cells = rng.sample(range(64), 12)
         # Nonadjacent kings; arbitrary supported pieces exercise blockers/pins.
         if max(abs(cells[0] // 8 - cells[1] // 8), abs(cells[0] % 8 - cells[1] % 8)) > 1:
-            fixtures.append(dict(zip(cells, [6, 12, 1, 7, 5, 11])))
+            fixtures.append(dict(zip(cells, [6, 12, 1, 7, 2, 8, 3, 9, 4, 10, 5, 11])))
+    fixtures += [{63 - n: (p + 6 if color(p) else p - 6) if p else 0
+                  for n, p in occupied.items()} for occupied in fixtures.copy()]
     for case, occupied in enumerate(fixtures):
         board = [occupied.get(n, 0) for n in range(64)]
         for white in (True, False):
             text += "release_request;\n@(negedge clock);\n"
-            text += "\n".join(f"board[{n}]=16'd{piece};" for n, piece in enumerate(board))
+            text += "\n".join(f"board[{n}]=4'd{piece};" for n, piece in enumerate(board))
             text += f"\nwhite={int(white)}; cursor=0;\n"
             for expected in legal_moves(board, white):
                 text += f'''ask;

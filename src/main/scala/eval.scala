@@ -117,14 +117,14 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
         // Widen before adding: 100 + 50 overflows an 8-bit signed sum.
         result := 100.S(16.W) + pawnTable(row)(col)
       }
-      is(2.U) { // White Knight
-        result := 320.S(16.W) + knightTable(7 - row)(col)
+      is(3.U) { // White Knight
+        result := 320.S(16.W) + knightTable(row)(col)
       }
-      is(3.U) { // White Bishop
-        result := 330.S(16.W) + bishopTable(7 - row)(col)
+      is(2.U) { // White Bishop
+        result := 330.S(16.W) + bishopTable(row)(col)
       }
       is(4.U) { // White Rook
-        result := 500.S(16.W) + rookTable(7 - row)(col)
+        result := 500.S(16.W) + rookTable(row)(col)
       }
       is(5.U) { // White Queen
         result := 900.S(16.W) + queenTable(row)(col)
@@ -135,14 +135,14 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
       is(7.U) { // Black Pawn
         result := -100.S(16.W) - pawnTable(7 - row)(col)
       }
-      is(8.U) { // Black Knight
-        result := -320.S(16.W) - knightTable(row)(col)
+      is(9.U) { // Black Knight
+        result := -320.S(16.W) - knightTable(7 - row)(col)
       }
-      is(9.U) { // Black Bishop
-        result := -330.S(16.W) - bishopTable(row)(col)
+      is(8.U) { // Black Bishop
+        result := -330.S(16.W) - bishopTable(7 - row)(col)
       }
       is(10.U) { // Black Rook
-        result := -500.S(16.W) - rookTable(row)(col)
+        result := -500.S(16.W) - rookTable(7 - row)(col)
       }
       is(11.U) { // Black Queen
         result := -900.S(16.W) - queenTable(7 - row)(col)

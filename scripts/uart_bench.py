@@ -10,7 +10,7 @@ module uart_test;
   wire tx;
   wire [15:0] led;
   reg [4:0] buttons = 0;
-  reg [7:0] response [0:34];
+  reg [7:0] response [0:32];
   reg [7:0] saved [0:31];
   integer n;
   Top dut(.clock(clock), .reset(reset), .io_rx(rx), .io_tx(tx), .io_led(led), .io_buttons(buttons));
@@ -42,7 +42,6 @@ module uart_test;
   endtask
   task exchange_raw(input [7:0] header, command, from_square, to_square, check);
     integer index;
-    reg [7:0] checksum;
     begin
       fork
         begin
@@ -50,34 +49,30 @@ module uart_test;
           send_byte(to_square); send_byte(check);
         end
         begin
-          for(index = 0; index < 35; index = index + 1) receive_byte(response[index]);
+          for(index = 0; index < 33; index = index + 1) receive_byte(response[index]);
         end
       join
-      if(response[0] !== 8'h55) $fatal(1, "Reply header corrupt: %h", response[0]);
-      checksum = 0;
-      for(index = 1; index < 34; index = index + 1) checksum = checksum ^ response[index];
-      if(checksum !== response[34]) $fatal(1, "Reply checksum corrupt");
     end
   endtask
   task exchange(input [7:0] command, from_square, to_square, corrupt);
-    begin exchange_raw(8'hAA, command, from_square, to_square,
+    begin exchange_raw(8'hFF, command, from_square, to_square,
       command ^ from_square ^ to_square ^ corrupt); end
   endtask
   function [3:0] piece(input integer square);
     begin
-      if(square % 2 == 0) piece = response[2 + square / 2] >> 4;
-      else piece = response[2 + square / 2] & 15;
+      if(square % 2 == 0) piece = response[square / 2] >> 4;
+      else piece = response[square / 2] & 15;
     end
   endfunction
   task expect_status(input [7:0] status);
-    begin if(response[1] !== status) $fatal(1, "Status %0d, expected %0d", response[1], status); end
+    begin if(response[32] !== status) $fatal(1, "Status %0d, expected %0d", response[32], status); end
   endtask
   task save_board;
-    begin for(n = 0; n < 32; n = n + 1) saved[n] = response[n + 2]; end
+    begin for(n = 0; n < 32; n = n + 1) saved[n] = response[n]; end
   endtask
   task unchanged;
     begin for(n = 0; n < 32; n = n + 1)
-      if(saved[n] !== response[n + 2]) $fatal(1, "Rejected move changed board"); end
+      if(saved[n] !== response[n]) $fatal(1, "Rejected move changed board"); end
   endtask
 '''
 
@@ -98,7 +93,15 @@ def generate():
     if(piece(4) != 12 || piece(60) != 6) $fatal(1, "Initial kings missing");
     for(n = 8; n < 16; n = n + 1) if(piece(n) != 7) $fatal(1, "Initial black pawns missing");
     for(n = 48; n < 56; n = n + 1) if(piece(n) != 1) $fatal(1, "Initial white pawns missing");
+    if(piece(0) != 10 || piece(1) != 9 || piece(2) != 8 || piece(3) != 11 ||
+       piece(56) != 4 || piece(57) != 3 || piece(58) != 2 || piece(59) != 5)
+      $fatal(1, "Full starting position missing");
     save_board;
+    exchange(3, 58, 23, 0); expect_status(5); unchanged; // Blocked bishop.
+    exchange(3, 56, 40, 0); expect_status(5); unchanged; // Blocked rook.
+    exchange(3, 57, 42, 0); expect_status(0); // Knight jumps b1-c3.
+    if(piece(57) != 0 || piece(42) != 3) $fatal(1, "Knight move not applied");
+    exchange(1, 0, 0, 0); save_board;
     exchange(3, 60, 44, 0); expect_status(5); unchanged; // King two squares.
     exchange(3, 12, 20, 0); expect_status(5); unchanged; // Wrong color.
     exchange(3, 60, 51, 0); expect_status(5); unchanged; // Friendly capture.
@@ -106,7 +109,7 @@ def generate():
     exchange(3, 52, 36, 1); expect_status(6); unchanged; // Bad checksum.
     exchange(99, 0, 0, 0); expect_status(6); unchanged;
     // A truncated packet times out and the next header resynchronizes.
-    send_byte(8'hAA); send_byte(3); repeat(100020) tick;
+    send_byte(8'hFF); send_byte(3); repeat(100020) tick;
     exchange(2, 0, 0, 0); expect_status(0); unchanged;
     exchange(3, 52, 36, 0); expect_status(0); // e2e4 + engine reply.
     if(piece(52) != 0 || piece(36) != 1) $fatal(1, "Human move not applied");
@@ -162,7 +165,7 @@ endmodule
       if(count != 5) $finish;
       exchange_raw(header, command, from_square, to_square, checksum);
       $write("FRAME ");
-      for(n = 0; n < 35; n = n + 1) $write("%02x", response[n]);
+      for(n = 0; n < 33; n = n + 1) $write("%02x", response[n]);
       $write("\n");
       $fflush(32'h80000001);
     end

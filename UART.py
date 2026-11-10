@@ -5,19 +5,22 @@ import time
 import sys
 import struct
 import traceback
+
+from engine_transport import (SerialTransport, SimulationTransport, STATUS,
+                              command_frame, decode_response, square, parse_move)
 # Definitions
 serial_port = '/dev/ttyUSB1'
 # serial_port = 'COM3'  # Change this to your actual serial port
 baud_rate = 115200
 initial_board = [
-    "0", "0", "0", "0", "k", "0", "0", "0",
+    "r", "n", "b", "q", "k", "b", "n", "r",
     "p", "p", "p", "p", "p", "p", "p", "p",
     "0", "0", "0", "0", "0", "0", "0", "0",
     "0", "0", "0", "0", "0", "0", "0", "0",
     "0", "0", "0", "0", "0", "0", "0", "0",
     "0", "0", "0", "0", "0", "0", "0", "0",
     "P", "P", "P", "P", "P", "P", "P", "P",
-    "0", "0", "0", "0", "K", "0", "0", "0"
+    "R", "N", "B", "Q", "K", "B", "N", "R"
 ]
 
 chessPieces = {
@@ -164,6 +167,7 @@ def main():
             ser.reset_output_buffer() # Clear any existing data in the output buffer
 
             send_command(ser, cmd=0x01)  # Send reset command to FPGA
+            receive_data(ser)  # Consume reset reply before loading squares.
             board = string_to_board(initial_board)  # Initialize the board with the initial state
             load_custom_board(ser, board)  # Load the initial board state into the FPGA
 
@@ -213,5 +217,11 @@ def main():
         traceback.print_exc()
         print("Couldnt open serial port.")
 
+# Shared GUI/simulator interface; legacy helpers and custom-board loading above
+# continue to use the same current hardware protocol.
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1:
+        from engine_transport import main as transport_main
+        transport_main()
+    else:
+        main()

@@ -94,6 +94,19 @@ class BoardTests(unittest.TestCase):
         self.assertEqual(transport.commands, [(1, 0, 0)])
         self.assertEqual(app.board, initial_board())
 
+    def test_remaining_pieces_are_drawn_and_selectable(self):
+        from chess_gui import GLYPHS
+        self.assertEqual(set(GLYPHS), set(range(1, 13)))
+        self.assertEqual(len(set(GLYPHS[p] for p in range(1, 7))), 6)
+        transport = FakeTransport()
+        app = self.make_window(lambda: transport)
+        for source, target in ((57, 42), (58, 23), (56, 40)):
+            self.click(source)
+            self.click(target)
+            self.assertTrue(app.busy)
+            self.wait_for(lambda: not app.busy)
+            self.assertEqual(transport.commands[-1], (3, source, target))
+
     def test_click_move_waits_for_board_and_prevents_duplicate_input(self):
         transport = FakeTransport()
         app = self.make_window(lambda: transport)
