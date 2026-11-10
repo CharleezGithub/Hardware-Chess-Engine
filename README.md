@@ -2,8 +2,8 @@
 
 Human plays white and the engine plays black from the standard 32-piece
 starting position. All six piece types can move, capture and give check. The
-FPGA uses depth-3 minimax; local RTL simulation uses depth 1 to keep full-board
-searches responsive. Pawns automatically promote to queens.
+FPGA uses depth-3 minimax; local RTL simulation uses depth 4 with alpha-beta
+pruning. Pawns automatically promote to queens.
 
 The hardware owns the board and validates every human move. It handles pawn
 single/double moves and captures, knight jumps, bishop/rook/queen sliding moves
@@ -20,7 +20,7 @@ test runner also recognizes `C:/Tools/oss-cad-suite`.
 ```bash
 python -m pip install -r requirements.txt
 python scripts/test_mvp.py
-python UART.py --simulate
+python UART.py --simulate --timeout 600
 ```
 
 The first command installs the serial client dependency. The test runner
@@ -38,7 +38,7 @@ the board unchanged. After game over, enter `new` to restart.
 After the setup above, launch the Python window:
 
 ```bash
-python chess_gui.py
+python chess_gui.py --timeout 600
 ```
 
 Click a white piece and its destination, or drag and drop it. The engine plays
