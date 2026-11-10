@@ -17,6 +17,11 @@ class SearchReg extends Bundle {
 
     val hasMove = Bool()
     val hasScored = Bool()
+
+    // Alpha beta pruning
+    val alpha = SInt(32.W) // Lower bound by white's max scores
+    val beta = SInt(32.W) // Upper bound by black's min scores
+
 }
 
 class minimax(maxDepth: Int) extends Module {
@@ -127,6 +132,8 @@ class minimax(maxDepth: Int) extends Module {
             searchReg(0).activeMove := 0.U
             searchReg(0).bestMove := 0.U
             searchReg(0).isMaximizing := whiteTurnReg
+            searchReg(0).alpha := minScore
+            searchReg(0).beta := maxScore
 
             searchReg(0).hasMove := false.B
             searchReg(0).hasScored := false.B
@@ -230,6 +237,9 @@ class minimax(maxDepth: Int) extends Module {
 
             searchReg(nextDepth).capturedPiece :=
                 workingBoard(toRow)(toCol)
+
+            searchReg(nextDepth).alpha := searchReg(nextDepth - 1.S).alpha
+            searchReg(nextDepth).beta := searchReg(nextDepth - 1.S).beta
 
             // udfør move på workingBoard
             // Automatically promote to a queen. movedPiece above keeps the
