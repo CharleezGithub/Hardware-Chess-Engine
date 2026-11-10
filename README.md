@@ -107,6 +107,8 @@ This is the fast, bundled MVP check. It covers:
 
 - Complete move enumeration against an independent software rules oracle.
 - Mate at the search horizon, promotion for both colors, captures and undo.
+- Depth-2 alpha-beta results against unpruned minimax, with cycle savings and
+  complete board restoration checked on the same positions.
 - Real UART bits: framing, checksums, truncated-packet recovery and illegal moves.
 - Consecutive human/engine turns, both winners, stalemate, bare kings and reset.
 - The real Python client and terminal UI playing against the UART RTL simulator.

@@ -24,7 +24,7 @@ class SearchReg extends Bundle {
 
 }
 
-class minimax(maxDepth: Int) extends Module {
+class minimax(maxDepth: Int, enablePruning: Boolean = true) extends Module {
     if (maxDepth < 1) {
         throw new IllegalArgumentException("maxDepth must be at least 1")
     }
@@ -238,8 +238,8 @@ class minimax(maxDepth: Int) extends Module {
             searchReg(nextDepth).capturedPiece :=
                 workingBoard(toRow)(toCol)
 
-            searchReg(nextDepth).alpha := searchReg(nextDepth - 1.S).alpha
-            searchReg(nextDepth).beta := searchReg(nextDepth - 1.S).beta
+            searchReg(nextDepth).alpha := searchReg(currentDepth).alpha
+            searchReg(nextDepth).beta := searchReg(currentDepth).beta
 
             // udfør move på workingBoard
             // Automatically promote to a queen. movedPiece above keeps the
@@ -320,26 +320,64 @@ class minimax(maxDepth: Int) extends Module {
         }
 
         is(sUpdate) {
-            // sammenlign score fra child med parent bestScore
+            val node = searchReg(currentDepth)
+
             val betterScore = Mux(
-                searchReg(currentDepth).isMaximizing,
-                returnedScore > searchReg(currentDepth).bestScore,
-                returnedScore < searchReg(currentDepth).bestScore
+                node.isMaximizing,
+                returnedScore > node.bestScore,
+                returnedScore < node.bestScore
             )
 
-            // gem resultat hvis det er første eller bedste move
-            when(!searchReg(currentDepth).hasScored || betterScore) {
-                searchReg(currentDepth).bestScore := returnedScore
+            val replaceBest = !node.hasScored || betterScore
 
-                searchReg(currentDepth).bestMove :=
-                    searchReg(currentDepth).activeMove
+            val updatedBestScore = Mux(
+                replaceBest,
+                returnedScore,
+                node.bestScore
+            )
+
+            val updatedBestMove = Mux(
+                replaceBest,
+                node.activeMove,
+                node.bestMove
+            )
+
+            val newAlpha = Mux(
+                node.isMaximizing && updatedBestScore > node.alpha,
+                updatedBestScore,
+                node.alpha
+            )
+
+            val newBeta = Mux(
+                !node.isMaximizing && updatedBestScore < node.beta,
+                updatedBestScore,
+                node.beta
+            )
+
+            node.bestScore := updatedBestScore
+            node.bestMove := updatedBestMove
+            node.hasScored := true.B
+            node.alpha := newAlpha
+            node.beta := newBeta
+
+            // Compile-time switch lets regression tests compare against a
+            // complete minimax search without changing the engine interface.
+            when(enablePruning.B && newAlpha >= newBeta) {
+                // Remaining moves cannot improve an ancestor's choice.
+                when(currentDepth === 0.U) {
+                    bestMoveReg := updatedBestMove
+                    bestScoreReg := updatedBestScore
+                    rootCheckReg := io.inCheck
+                    state := sDone
+                }.otherwise {
+                    returnedScore := updatedBestScore
+                    state := sBacktrack
+                }
+            }.otherwise {
+                state := sGetMove
             }
-
-            searchReg(currentDepth).hasScored := true.B
-
-            // fortsæt med næste move ved samme depth
-            state := sGetMove
         }
+
 
         is(sDone) {
             // søgningen er færdig

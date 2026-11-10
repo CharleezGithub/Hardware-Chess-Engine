@@ -23,7 +23,7 @@ module minimax_native_test;
   wire sawPiece, done;
   wire [11:0] bestMove;
   wire signed [31:0] bestScore;
-  integer n, cycles;
+  integer n, cycles, case_number=0;
   KingPawnSearchHarness dut (CONNECTIONS);
 
   task tick;
@@ -52,6 +52,8 @@ module minimax_native_test;
       for (n = 0; n < 64; n = n + 1)
         if (workingBoard[n] !== board[n])
           $fatal(1, "Backtracking failed at square %0d: got %0d expected %0d", n, workingBoard[n], board[n]);
+      $display("RESULT %0d %0d %0d %0d", case_number, bestMove, bestScore, cycles);
+      case_number = case_number + 1;
     end
   endtask
 
