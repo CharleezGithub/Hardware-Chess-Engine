@@ -10,7 +10,7 @@ object ChessPosition {
     }
 }
 
-// Commands: 1 = new game, 2 = get board, 3 = move.
+// Commands: 1 = new game, 2 = get board, 3 = move, 4 = set piece (for loading in new board).
 // Replies: 0 = white to move, 2 = white wins, 3 = black wins,
 //          4 = draw, 5 = illegal move, 6 = bad command/frame.
 class GameController(maxDepth: Int = 2) extends Module {
