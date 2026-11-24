@@ -2,6 +2,7 @@
 import argparse
 import queue
 import threading
+import time
 import tkinter as tk
 from tkinter import font as tkfont, messagebox
 
@@ -35,11 +36,14 @@ class EngineWorker:
                 command = self.commands.get()
                 if command is None or self.stopped.is_set():
                     break
-                response = transport.exchange(command_frame(*command))
-                self.results.put((command, response, None))
+                frame = command_frame(*command)
+                started = time.perf_counter()
+                response = transport.exchange(frame)
+                elapsed = time.perf_counter() - started if command[0] == 3 else None
+                self.results.put((command, response, None, elapsed))
         except Exception as exc:
             if not self.stopped.is_set():
-                self.results.put((None, None, str(exc)))
+                self.results.put((None, None, str(exc), None))
         finally:
             self._close_transport()
 
@@ -247,7 +251,7 @@ class ChessWindow:
             return
         if not self.reconnecting:
             try:
-                command, response, error = self.worker.results.get_nowait()
+                command, response, error, elapsed = self.worker.results.get_nowait()
             except queue.Empty:
                 pass
             else:
@@ -262,7 +266,12 @@ class ChessWindow:
                     self.status, board = response
                     self.changed = {n for n in range(64) if board[n] != self.board[n]} if command[0] == 3 else set()
                     self.board = list(board)
-                    self.message.set("" if self.status == 0 else STATUS[self.status])
+                    message = "" if self.status == 0 else STATUS[self.status]
+                    if elapsed is not None:
+                        timing = f"Move processed in {elapsed:.3f} seconds."
+                        print(timing, flush=True)
+                        message = f"{message} {timing}".strip()
+                    self.message.set(message)
                     self.detail.set("")
                 self.update_controls()
                 self.draw()
