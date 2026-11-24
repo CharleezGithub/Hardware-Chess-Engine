@@ -1,9 +1,9 @@
-// Basys 3: convert the 100 MHz oscillator to a relaxed 20 MHz engine clock.
+// Basys 3: convert the 100 MHz oscillator to a 32 MHz engine clock.
 module BasysTop(input clock, input reset, input io_rx,
                 input [4:0] io_buttons, output io_tx, output [15:0] io_led);
   wire feedback, feedback_buffered, core_unbuffered, core_clock, locked;
   MMCME2_BASE #(.CLKIN1_PERIOD(10.0), .CLKFBOUT_MULT_F(10.0),
-                .DIVCLK_DIVIDE(1), .CLKOUT0_DIVIDE_F(50.0)) pll (
+                .DIVCLK_DIVIDE(1), .CLKOUT0_DIVIDE_F(31.25)) pll (
     .CLKIN1(clock), .CLKFBIN(feedback_buffered), .CLKFBOUT(feedback),
     .CLKOUT0(core_unbuffered), .LOCKED(locked), .PWRDWN(1'b0), .RST(reset)
   );

@@ -88,10 +88,10 @@ The build creates `build/fpga/chess.bit`, a routed checkpoint, utilization and
 timing reports. It fails on negative setup or hold slack. Programming requires
 a connected Basys 3; simulation does not.
 
-`fpga/BasysTop.sv` is the synthesis top. Its MMCM derives a 20 MHz engine clock
+`fpga/BasysTop.sv` is the synthesis top. Its MMCM derives a 32 MHz engine clock
 from the board's 100 MHz oscillator and synchronizes reset release. Do not wire
 the default generated `Top` directly to 100 MHz: its UART is configured for the
-20 MHz clock. The existing `basys3.xdc` supplies the pins and oscillator timing.
+32 MHz clock. The existing `basys3.xdc` supplies the pins and oscillator timing.
 Switch 15 resets the hardware. Button 0 queues a new game. LEDs 0–2 show game
 status, LED 8 shows controller activity, and LED 9 shows UART transmission.
 Use `new` to restart while the client is open. After a physical reset, restart
@@ -169,7 +169,7 @@ or the final board if the game ended before the engine could move.
 
 ## Chess engine results in different depth
 
-The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. All time measurements are taken with a target clock of **20 MHz** (50 ns period).
+The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. The measurements in this table were taken with a target clock of **20 MHz** (50 ns period).
 
 **Available FPGA Resources:** 20,800 LUTs | 41,600 FFs | 106 I/O | 32 BUFG | 5 MMCM
 
