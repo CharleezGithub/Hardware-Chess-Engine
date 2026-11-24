@@ -56,7 +56,17 @@ class minimaxTest extends AnyFlatSpec with ChiselScalatestTester {
                 )
 
             } else {
-                Seq.empty
+                // Give black a legal king move at depth 3
+                val blackKing = (0 until 64).find(i =>
+                    board(i / 8)(i % 8) == 12
+                )
+
+                blackKing match {
+                    case Some(4)  => Seq(makeMove(4, 11))   // e8 -> d7
+                    case Some(11) => Seq(makeMove(11, 12))  // d7 -> e7
+                    case Some(13) => Seq(makeMove(13, 12))  // f7 -> e7
+                    case _        => Seq.empty
+                }
             }
         }
     }
