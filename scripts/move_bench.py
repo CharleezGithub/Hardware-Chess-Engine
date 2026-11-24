@@ -102,6 +102,29 @@ repeat(3) tick;
     # and edge squares. Mirror every fixture to cover both colors equally.
     opening = [10, 9, 8, 11, 12, 8, 9, 10] + [7] * 8 + [0] * 32 + [1] * 8 + [4, 3, 2, 5, 6, 2, 3, 4]
     assert len(legal_moves(opening, True)) == len(legal_moves(opening, False)) == 20
+
+    # The controller can start at an arbitrary encoded move when validating a
+    # human move. Check exact, between-move, source-boundary and end cursors.
+    after_e4 = opening.copy()
+    after_e4[52], after_e4[36] = 0, 1
+    black_moves = legal_moves(after_e4, False)
+    text += "\n".join(f"board[{n}]=4'd{piece};" for n, piece in enumerate(after_e4))
+    text += "\nwhite=0;\n"
+    for cursor in (0, 80, 81, 127, 511, 4095, 4096, 8191):
+        text += f"release_request; cursor=13'd{cursor}; ask;\n"
+        expected = next((move for move in black_moves if move >= cursor), None)
+        if expected is None:
+            text += f'if(valid || !finished || next_cursor!==4096) $fatal(1,"Expected end for cursor {cursor}");\n'
+        else:
+            text += f'''if(!valid || finished || move!==12'd{expected} || next_cursor!==13'd{expected + 1})
+  $fatal(1,"Cursor {cursor} returned %0d, expected {expected}",move);
+'''
+        if cursor == 0:
+            # The old scanner spent 64 clocks on the blocked a8 rook before
+            # reaching the b8 knight. A whole square scan would be a regression.
+            text += '''if(cycles>=64) $fatal(1,"First black reply after e4 took %0d scan clocks",cycles);
+$display("PASS first black reply after e4 in %0d scan clocks",cycles);
+'''
     fixtures += [dict(enumerate(opening)),
         {60: 6, 4: 12, 35: 4, 19: 1, 37: 7, 33: 7, 51: 1},
         {60: 6, 4: 12, 35: 2, 17: 1, 21: 7, 49: 7, 53: 1},

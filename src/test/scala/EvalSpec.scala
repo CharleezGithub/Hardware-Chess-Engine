@@ -3,6 +3,24 @@ import chiseltest._
 import org.scalatest.flatspec.AnyFlatSpec
 
 class EvalSpec extends AnyFlatSpec with ChiselScalatestTester {
+    "King evaluation" should "select the table from non-king material on the current board" in {
+        test(new MatrixBuffer8x8()) { dut =>
+            // White Kd4, Qb2, Rh1, Pa2 and black Kf6, Qa5 total 2400 in non-king material.
+            val board = MoveGeneratorTestData.position("d4" -> 6, "b2" -> 5, "h1" -> 4,
+                "a2" -> 1, "f6" -> 12, "a5" -> 11)
+            for (row <- 0 until 8; col <- 0 until 8)
+                dut.io.boardState(row)(col).poke(board(row)(col).U)
+            for (_ <- 0 until 5) {
+                dut.io.score.expect(625.S)
+                dut.clock.step()
+            }
+            dut.io.boardState(6)(6).poke(1.U) // Adding a pawn switches to middlegame.
+            dut.io.score.expect(695.S)
+            dut.io.boardState(6)(6).poke(0.U)
+            dut.io.score.expect(625.S)
+        }
+    }
+
     "Full-piece evaluation" should "use the board piece IDs and mirror black's tables" in {
         test(new MatrixBuffer8x8()) { dut =>
             for (row <- 0 until 8; col <- 0 until 8)

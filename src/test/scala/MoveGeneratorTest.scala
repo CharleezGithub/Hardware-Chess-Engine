@@ -36,7 +36,7 @@ class MoveGeneratorTest extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.whiteTurn.poke(white.B)
         dut.io.cursor.poke(cursor.U)
         dut.io.request.poke(true.B)
-        dut.clock.step(2) // Latch the cursor, then check its first candidate.
+        dut.clock.step() // Accept the request. Enumeration latency depends on the position.
     }
 
     def waitForResult(dut: MoveGenerator): Unit = {
@@ -94,6 +94,7 @@ class MoveGeneratorTest extends AnyFlatSpec with ChiselScalatestTester {
             request(dut, board, true, 0)
             dut.io.moveValid.expect(false.B)
             request(dut, board, true, expected.head)
+            waitForResult(dut)
             dut.io.moveValid.expect(true.B)
             dut.io.generatedMove.expect(expected.head.U)
 
@@ -116,13 +117,14 @@ class MoveGeneratorTest extends AnyFlatSpec with ChiselScalatestTester {
                 val candidate = move(from, to)
                 request(dut, board, white, candidate)
                 dut.io.inCheck.expect(inCheck.B)
-                // A legal first candidate is ready after two cycles; an illegal
-                // one must still be scanning, without presenting a result.
-                dut.io.moveValid.expect(legal.B)
-                dut.io.moveFinished.expect(false.B)
-                if (legal) {
-                    dut.io.generatedMove.expect(candidate.U)
-                    dut.io.nextCursor.expect((candidate + 1).U)
+                waitForResult(dut)
+                val valid = dut.io.moveValid.peek().litToBoolean
+                val returned = dut.io.generatedMove.peek().litValue
+                assert((valid && returned == candidate) == legal,
+                    s"Unexpected legality for $from$to (valid=$valid, returned=$returned)")
+                if (valid) {
+                    assert(returned >= candidate)
+                    dut.io.nextCursor.expect((returned + 1).U)
                 }
             }
 

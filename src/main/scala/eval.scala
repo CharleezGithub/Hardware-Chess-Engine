@@ -5,7 +5,6 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
   val io = IO(new Bundle {
     // INPUT
     // Board position
-    // Is it late-game?
     val boardState = Input(Vec(8, Vec(8, UInt(4.W))))
 
     // OUTPUT
@@ -106,6 +105,16 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
     )
   )
 
+  // Index by the four-bit board encoding. Only non-king material sets the phase.
+  val materialValue = VecInit(Seq(
+    0, 100, 330, 320, 500, 900, 0,  // Empty, then white pawn through king
+       100, 330, 320, 500, 900, 0,  // Black pawn through king
+    0, 0, 0                         // Unused IDs
+  ).map(_.U(10.W)))
+  val totalMaterial = VecInit(io.boardState.flatten.map(piece => materialValue(piece)))
+    .reduceTree(_ +& _)
+  val kingTable = Mux(totalMaterial <= 2400.U, kingEndGameTable, kingMiddleGameTable)
+
   def evaluateSquare(piece: UInt, row: Int, col: Int): SInt = {
     val result = WireDefault(0.S(16.W))
 
@@ -129,8 +138,8 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
       is(5.U) { // White Queen
         result := 900.S(16.W) + queenTable(row)(col)
       }
-      is(6.U) { // White king (endgame).
-        result := 20000.S(16.W) + kingEndGameTable(row)(col)
+      is(6.U) { // White king.
+        result := 20000.S(16.W) + kingTable(row)(col)
       }
       is(7.U) { // Black Pawn
         result := -100.S(16.W) - pawnTable(7 - row)(col)
@@ -147,8 +156,8 @@ class MatrixBuffer8x8(val width: Int = 16) extends Module {
       is(11.U) { // Black Queen
         result := -900.S(16.W) - queenTable(7 - row)(col)
       }
-      is(12.U) { // Black king (endgame).
-        result := -20000.S(16.W) - kingEndGameTable(7 - row)(col)
+      is(12.U) { // Black king.
+        result := -20000.S(16.W) - kingTable(7 - row)(col)
       }
 
     }

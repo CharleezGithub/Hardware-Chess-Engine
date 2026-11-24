@@ -41,59 +41,69 @@ class MoveGenerator extends Module {
     }
     val emptySquares = squaresContaining(io.board, 0.U)
 
-    // The candidate number is also the move encoding: upper 6 bits = from,
-    // lower 6 bits = to. 4096 means that all 64 * 64 pairs have been checked.
-    val candidate = RegInit(0.U(13.W))
-    val fromSquare = candidate(11, 6)
-    val toSquare = candidate(5, 0)
+    val ownSquares = VecInit(io.board.flatten.map { p =>
+        Mux(io.whiteTurn, p >= pieces.white_pawn && p <= pieces.white_king,
+            p >= pieces.black_pawn && p <= pieces.black_king)
+    }).asUInt
+    val capturable = VecInit(io.board.flatten.map { p =>
+        Mux(io.whiteTurn, p >= pieces.black_pawn && p < pieces.black_king,
+            p >= pieces.white_pawn && p < pieces.white_king)
+    }).asUInt
+
+    // Return a bitboard shifted by a fixed chess displacement. Mask the
+    // outer files before shifting so a step cannot wrap into another rank.
+    def shift(squares: UInt, dr: Int, dc: Int): UInt = {
+        val files = (0 until 64).filter { n =>
+            val col = n % 8 + dc
+            col >= 0 && col < 8
+        }.foldLeft(BigInt(0))((mask, n) => mask.setBit(n))
+        val clipped = squares & files.U(64.W)
+        val distance = 8 * dr + dc
+        if (distance > 0) (clipped << distance)(63, 0)
+        else (clipped >> -distance).pad(64)
+    }
+
+    val fromSquare = RegInit(0.U(6.W))
     val fromRow = fromSquare(5, 3)
     val fromCol = fromSquare(2, 0)
+    val movingPiece = io.board(fromRow)(fromCol)
+    val source = UIntToOH(fromSquare, 64)
+
+    val directions = Seq((-1, -1), (-1, 0), (-1, 1), (0, -1),
+                         (0, 1), (1, -1), (1, 0), (1, 1))
+    val knightOffsets = Seq((-2, -1), (-2, 1), (-1, -2), (-1, 2),
+                            (1, -2), (1, 2), (2, -1), (2, 1))
+    val kingTargets = directions.map { case (dr, dc) => shift(source, dr, dc) }.reduce(_ | _)
+    val knightTargets = knightOffsets.map { case (dr, dc) => shift(source, dr, dc) }.reduce(_ | _)
+
+    // Include the first occupied square on each ray, but propagate only
+    // through empty squares. Friendly pieces and enemy kings are masked below.
+    val sliderTargets = directions.map { case (dr, dc) =>
+        val slider = if (dr == 0 || dc == 0) ownRook else ownBishop
+        var frontier = Mux(movingPiece === ownQueen || movingPiece === slider, source, 0.U)
+        (1 to 7).map { _ =>
+            val next = shift(frontier, dr, dc)
+            frontier = next & emptySquares
+            next
+        }.reduce(_ | _)
+    }.reduce(_ | _)
+
+    val pawnStep = Mux(io.whiteTurn, shift(source, -1, 0), shift(source, 1, 0))
+    val singlePush = pawnStep & emptySquares
+    val doublePush = Mux(io.whiteTurn, shift(singlePush, -1, 0), shift(singlePush, 1, 0)) & emptySquares
+    val pawnCaptures = (shift(pawnStep, 0, -1) | shift(pawnStep, 0, 1)) & capturable
+    val pawnTargets = singlePush | pawnCaptures |
+        Mux(fromRow === Mux(io.whiteTurn, 6.U, 1.U), doublePush, 0.U)
+
+    val targets = (emptySquares | capturable) & (sliderTargets |
+        Mux(movingPiece === ownKing, kingTargets, 0.U) |
+        Mux(movingPiece === ownKnight, knightTargets, 0.U) |
+        Mux(movingPiece === ownPawn, pawnTargets, 0.U))
+
+    val remainingTargets = RegInit(0.U(64.W))
+    val toSquare = PriorityEncoder(remainingTargets)
     val toRow = toSquare(5, 3)
     val toCol = toSquare(2, 0)
-    val movingPiece = io.board(fromRow)(fromCol)
-    val targetPiece = io.board(toRow)(toCol)
-
-    // Signed differences avoid wrapping around at the edges of the board.
-    val rowDifference = toRow.zext - fromRow.zext
-    val colDifference = toCol.zext - fromCol.zext
-    val rowDistance = Mux(rowDifference < 0.S, -rowDifference, rowDifference).asUInt
-    val colDistance = Mux(colDifference < 0.S, -colDifference, colDifference).asUInt
-
-    val targetEmpty = targetPiece === 0.U
-    val targetEnemy = Mux(io.whiteTurn,
-        targetPiece >= pieces.black_pawn && targetPiece <= pieces.black_king,
-        targetPiece >= pieces.white_pawn && targetPiece <= pieces.white_king)
-    val canLand = targetEmpty || (targetEnemy && targetPiece =/= enemyKing)
-
-    val kingMove = movingPiece === ownKing && rowDistance <= 1.U && colDistance <= 1.U
-
-    val forward = Mux(io.whiteTurn, (-1).S(4.W), 1.S(4.W))
-    val startingRow = Mux(io.whiteTurn, 6.U, 1.U)
-    val middleRow = (fromRow.zext + forward).asUInt
-    val pawnStep = rowDifference === forward && colDifference === 0.S && targetEmpty
-    val pawnDoubleStep = fromRow === startingRow &&
-        rowDifference === Mux(io.whiteTurn, (-2).S, 2.S) &&
-        colDifference === 0.S && targetEmpty && io.board(middleRow(2, 0))(fromCol) === 0.U
-    val pawnCapture = rowDifference === forward && colDistance === 1.U && targetEnemy
-    val pawnMove = movingPiece === ownPawn && (pawnStep || pawnDoubleStep || pawnCapture)
-
-    // A queen follows a straight line or diagonal, with no pieces in between.
-    val rowStep = Mux(rowDifference > 0.S, 1.S(5.W), Mux(rowDifference < 0.S, (-1).S(5.W), 0.S(5.W)))
-    val colStep = Mux(colDifference > 0.S, 1.S(5.W), Mux(colDifference < 0.S, (-1).S(5.W), 0.S(5.W)))
-    val moveDistance = Mux(rowDistance > colDistance, rowDistance, colDistance)
-    val pathClear = (1 until 7).map { distance =>
-        val row = (fromRow.zext + rowStep * distance.S).asUInt
-        val col = (fromCol.zext + colStep * distance.S).asUInt
-        distance.U >= moveDistance || emptySquares(Cat(row(2, 0), col(2, 0)))
-    }.reduce(_ && _)
-    val straight = rowDifference === 0.S || colDifference === 0.S
-    val diagonal = rowDistance === colDistance
-    val queenMove = movingPiece === ownQueen && pathClear && (straight || diagonal)
-    val rookMove = movingPiece === ownRook && pathClear && straight
-    val bishopMove = movingPiece === ownBishop && pathClear && diagonal
-    val knightMove = movingPiece === ownKnight &&
-        ((rowDistance === 1.U && colDistance === 2.U) ||
-         (rowDistance === 2.U && colDistance === 1.U))
 
     // Look outwards from the king in eight directions. The first piece on a
     // ray can attack; pieces behind it cannot. Pawns and kings attack nearby.
@@ -105,8 +115,6 @@ class MoveGenerator extends Module {
         val knights = squaresContaining(board, enemyKnight)
         val kings = squaresContaining(board, enemyKing)
         val pawns = squaresContaining(board, enemyPawn)
-        val directions = Seq((-1, -1), (-1, 0), (-1, 1), (0, -1),
-                             (0, 1), (1, -1), (1, 0), (1, 1))
         val attacks = directions.flatMap { case (dr, dc) =>
             var clear = true.B
             (1 to 7).map { distance =>
@@ -125,8 +133,7 @@ class MoveGenerator extends Module {
                 attack
             }
         }
-        val knightAttacks = Seq((-2, -1), (-2, 1), (-1, -2), (-1, 2),
-                                (1, -2), (1, 2), (2, -1), (2, 1)).map { case (dr, dc) =>
+        val knightAttacks = knightOffsets.map { case (dr, dc) =>
             val row = square(5, 3).zext + dr.S(5.W)
             val col = square(2, 0).zext + dc.S(5.W)
             val inside = row >= 0.S && row < 8.S && col >= 0.S && col < 8.S
@@ -147,39 +154,52 @@ class MoveGenerator extends Module {
     afterMove(fromRow)(fromCol) := 0.U
     afterMove(toRow)(toCol) := movingPiece
     val kingAfterMove = Mux(movingPiece === ownKing, toSquare, kingSquare)
-    val legalMove = fromSquare =/= toSquare && canLand &&
-        (kingMove || pawnMove || queenMove || rookMove || bishopMove || knightMove) && kingPresent &&
-        !kingAttacked(afterMove, kingAfterMove)
+    val safe = kingPresent && !kingAttacked(afterMove, kingAfterMove)
 
-    val sIdle :: sScan :: sResult :: Nil = Enum(3)
+    // The public cursor is still an inclusive lower bound on (from << 6 | to).
+    // Selecting the lowest remaining bit retains the order used by minimax and
+    // lets the controller validate a human move starting at that exact cursor.
+    def atOrAbove(square: UInt): UInt = (~0.U(64.W) << square)(63, 0)
+
+    val remainingSources = RegInit(0.U(64.W))
+    val firstTarget = RegInit(0.U(6.W))
+    val move = Cat(fromSquare, toSquare)
+    val sIdle :: sSource :: sGenerate :: sTest :: sValid :: sFinished :: Nil = Enum(6)
     val state = RegInit(sIdle)
-    val finished = candidate >= 4096.U
-
     when(!io.request) {
         state := sIdle
     }.otherwise {
         switch(state) {
             is(sIdle) {
-                candidate := io.cursor
-                state := sScan
+                remainingSources := ownSquares & atOrAbove(io.cursor(11, 6))
+                state := Mux(io.cursor(12), sFinished, sSource)
             }
-            is(sScan) {
-                when(finished || legalMove) {
-                    state := sResult
-                }.elsewhen(!Mux(io.whiteTurn, movingPiece >= pieces.white_pawn && movingPiece <= pieces.white_king,
-                    movingPiece >= pieces.black_pawn && movingPiece <= pieces.black_king)) {
-                    // No move can start here; skip all destinations for this square.
-                    candidate := (fromSquare +& 1.U) << 6
+            is(sSource) {
+                val nextSource = PriorityEncoder(remainingSources)
+                fromSquare := nextSource
+                firstTarget := Mux(nextSource === io.cursor(11, 6), io.cursor(5, 0), 0.U)
+                remainingSources := remainingSources & (remainingSources - 1.U)
+                state := Mux(remainingSources.orR, sGenerate, sFinished)
+            }
+            is(sGenerate) {
+                val candidates = targets & atOrAbove(firstTarget)
+                remainingTargets := candidates
+                state := Mux(candidates.orR, sTest, sSource)
+            }
+            is(sTest) {
+                when(safe) {
+                    state := sValid
                 }.otherwise {
-                    candidate := candidate + 1.U
+                    val rest = remainingTargets & (remainingTargets - 1.U)
+                    remainingTargets := rest
+                    state := Mux(rest.orR, sTest, sSource)
                 }
             }
-            // Hold the result until minimax lowers request.
+            // sValid and sFinished hold their result until request falls.
         }
     }
-
-    io.generatedMove := candidate(11, 0)
-    io.nextCursor := Mux(finished, 4096.U, candidate + 1.U)
-    io.moveValid := io.request && state === sResult && !finished
-    io.moveFinished := io.request && state === sResult && finished
+    io.generatedMove := move
+    io.nextCursor := Mux(state === sFinished, 4096.U, move +& 1.U)
+    io.moveValid := io.request && state === sValid
+    io.moveFinished := io.request && state === sFinished
 }

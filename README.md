@@ -2,8 +2,8 @@
 
 Human plays white and the engine plays black from the standard 32-piece
 starting position. All six piece types can move, capture and give check. The
-FPGA uses depth-3 minimax; local RTL simulation uses depth 4 with alpha-beta
-pruning. Pawns automatically promote to queens.
+FPGA defaults to depth 7 and local RTL simulation uses depth 4. Both use
+minimax with alpha-beta pruning. Pawns automatically promote to queens.
 
 The hardware owns the board and validates every human move. It handles pawn
 single/double moves and captures, knight jumps, bishop/rook/queen sliding moves
@@ -134,9 +134,12 @@ Piece IDs are `0` empty; `1/2/3/4/5/6` white pawn/bishop/knight/rook/queen/king;
 per square.
 A move is `(fromSquare << 6) | toSquare`, a 12-bit unsigned number.
 
-The generator's 13-bit cursor is a bookmark among 4096 candidate from/to pairs.
-It scans from `cursor`, returns a legal `generatedMove` and `nextCursor`, or
-asserts `moveFinished` at 4096. `inCheck` describes the supplied board.
+The generator's 13-bit cursor is an inclusive lower bound on the encoded move.
+It selects friendly pieces in square order and builds a destination mask for each
+piece. Sliding rays stop at their first blocker. Each remaining destination is
+checked for king safety in square order. The generator returns a legal
+`generatedMove` with `nextCursor = generatedMove + 1`, or asserts `moveFinished`
+with `nextCursor = 4096` when no legal move remains. `inCheck` describes the supplied board.
 Keep board, side and cursor stable while `request` is high. Read the result
 when `moveValid` or `moveFinished` is high, then lower `request` for a clock.
 Minimax saves a separate cursor at each depth and asserts `moveRequest` while
