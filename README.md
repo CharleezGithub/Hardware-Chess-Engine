@@ -2,8 +2,8 @@
 
 Human plays white and the engine plays black from the standard 32-piece
 starting position. All six piece types can move, capture and give check. The
-FPGA defaults to depth 7 and local RTL simulation uses depth 4. Both use
-minimax with alpha-beta pruning. Pawns automatically promote to queens.
+FPGA uses depth-3 minimax; local RTL simulation uses depth 4 with alpha-beta
+pruning. Pawns automatically promote to queens.
 
 The hardware owns the board and validates every human move. It handles pawn
 single/double moves and captures, knight jumps, bishop/rook/queen sliding moves
@@ -88,10 +88,10 @@ The build creates `build/fpga/chess.bit`, a routed checkpoint, utilization and
 timing reports. It fails on negative setup or hold slack. Programming requires
 a connected Basys 3; simulation does not.
 
-`fpga/BasysTop.sv` is the synthesis top. Its MMCM derives a 32 MHz engine clock
+`fpga/BasysTop.sv` is the synthesis top. Its MMCM derives a 20 MHz engine clock
 from the board's 100 MHz oscillator and synchronizes reset release. Do not wire
 the default generated `Top` directly to 100 MHz: its UART is configured for the
-32 MHz clock. The existing `basys3.xdc` supplies the pins and oscillator timing.
+20 MHz clock. The existing `basys3.xdc` supplies the pins and oscillator timing.
 Switch 15 resets the hardware. Button 0 queues a new game. LEDs 0–2 show game
 status, LED 8 shows controller activity, and LED 9 shows UART transmission.
 Use `new` to restart while the client is open. After a physical reset, restart
@@ -134,12 +134,9 @@ Piece IDs are `0` empty; `1/2/3/4/5/6` white pawn/bishop/knight/rook/queen/king;
 per square.
 A move is `(fromSquare << 6) | toSquare`, a 12-bit unsigned number.
 
-The generator's 13-bit cursor is an inclusive lower bound on the encoded move.
-It selects friendly pieces in square order and builds a destination mask for each
-piece. Sliding rays stop at their first blocker. Each remaining destination is
-checked for king safety in square order. The generator returns a legal
-`generatedMove` with `nextCursor = generatedMove + 1`, or asserts `moveFinished`
-with `nextCursor = 4096` when no legal move remains. `inCheck` describes the supplied board.
+The generator's 13-bit cursor is a bookmark among 4096 candidate from/to pairs.
+It scans from `cursor`, returns a legal `generatedMove` and `nextCursor`, or
+asserts `moveFinished` at 4096. `inCheck` describes the supplied board.
 Keep board, side and cursor stable while `request` is high. Read the result
 when `moveValid` or `moveFinished` is high, then lower `request` for a clock.
 Minimax saves a separate cursor at each depth and asserts `moveRequest` while
@@ -169,16 +166,40 @@ or the final board if the game ended before the engine could move.
 
 ## Chess engine results in different depth
 
-The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. The measurements in this table were taken with a target clock of **20 MHz** (50 ns period).
+The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. All time measurements are taken with a target clock of **20 MHz** ($T_{\text{clk}} = 50\text{ ns}$).
+
+The maximum operating frequency ($F_{\max}$) is calculated from the target clock period and Worst Negative Slack (WNS):
+
+$$F_{\max} = \frac{1}{T_{\text{clk}} - \text{WNS}} = \frac{1000}{50 - \text{WNS}}\text{ MHz}$$
 
 **Available FPGA Resources:** 20,800 LUTs | 41,600 FFs | 106 I/O | 32 BUFG | 5 MMCM
 
-| Search Depth | LUTs (Used / %) | Flip-Flops (Used / %) | I/O | BUFG | MMCM | WNS (ns) | Response Time / Notes |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **2** | 8,213 (39.49%) | 1,451 (3.49%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.998 | — |
-| **4** | 8,475 (40.75%) | 1,765 (4.24%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.526 | 0.05 – 0.1 s per move |
-| **5** | 8,417 (40.47%) | 1,922 (4.62%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 23.372 | 0.5 – 12 s per move |
-| **6** | 9,270 (44.57%) | 3,639 (8.75%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.758 | 4.175 - 27.5 s per move |
-| **8** | 8,514 (40.93%) | 2,388 (5.74%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 20.828 | 4.175 - 27.5 s per move |
-| **10** | 9,141 (43.95%) | 2,709 (6.51%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.422 | Timed out  > 600 s|
-| **16** | 9,270 (44.57%) | 3,638 (8.75%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | N/A | Timed out (> 30 s) |
+| Search Depth | LUTs (Used / %) | Flip-Flops (Used / %) | I/O | BUFG | MMCM | WNS (ns) | $F_{\max}$ (MHz) | Response Time / Notes |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **2** | 8,213 (39.49%) | 1,451 (3.49%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.998 | 37.03 | — |
+| **4** | 8,475 (40.75%) | 1,765 (4.24%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.526 | 36.40 | 0.05 – 0.1 s per move |
+| **5** | 8,417 (40.47%) | 1,922 (4.62%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 23.372 | 37.55 | 0.5 – 12 s per move |
+| **6** | 9,270 (44.57%) | 3,639 (8.75%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.758 | 36.71 | 4.175 – 27.5 s per move |
+| **7** | 8,553 (41.12%) | 2,240 (5.38%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.053 | 35.78 | 63.94 – 532.134 s per move |
+| **8** | 8,514 (40.93%) | 2,388 (5.74%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 20.828 | 34.28 | Timed out (> 600 s) |
+| **10** | 9,141 (43.95%) | 2,709 (6.51%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.422 | 36.26 | Timed out (> 600 s) |
+
+The time estimations are based on a sequence of several moves rather than a single measurement. Opening moves are significantly faster because major pieces like the rook and queen are blocked, resulting in a much narrower search tree at the beginning of the game. Because the branching factor widens as pieces develop, a min–max time range is reported across the following fixed move sequence:
+
+1. Pawn `d2` to `d4`
+2. Queen `d1` to `d3`
+3. Bishop `c1` to `f4`
+4. Knight `b1` to `a3`
+5. Pawn `g2` to `g3`
+6. Bishop `f1` to `h3`
+
+### Analysis & Optimal Depth Selection
+
+
+
+## Use of Ai 
+Generative Ai has been used for this project, mainly as code helper and advisor.
+### Python/GUI code assistance
+For example the `UART.py` was initially coded completely by hand and would let the user play chess with the FPGA board through the terminal. But `UART.py` did include a lot of spelling errors in the print statement, and the code was nearly unreadable, so AI was used to check for spelling errors and increasing the readability of the code, while the core logic of the python script remained the same. After this script was implemented, we wanted to be able to play chess with a graphical user interface (GUI) instead of the terminal, but since making a GUI is not the main emphasis of the project, we used generative AI to make the `chess_gui.py` script, by using the `UART.py`.
+### UART protocol design advice
+As previously mentioned, generative AI was used as an advisor, as an example is the Uart Receive logic. It was designed to receive a command and a chess move, in a from-to format. The initial commands only included reset board, get board and move, but we also wanted to be able to load in a board state through the UART, in which we cant load in an entire board with the from-to UART receiver format used. Instead of rewriting the entire UART receiver protocol, we asked generative AI how to implement this with our current design, and it suggested implementing a simple set piece command, where we then can call set piece for each chess square, to load in an entire chess board with the UART.

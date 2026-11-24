@@ -214,6 +214,7 @@ def main():
                 end_time = time.time()
                 elapsed_time = end_time - start_time
                 print(f"Move processed in {elapsed_time:.3f} seconds.")
+                
     except KeyboardInterrupt:
         print("KeyboardInterrupt detected. Exiting...")
     except serial.SerialException as e:
