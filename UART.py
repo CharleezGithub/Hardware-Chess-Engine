@@ -206,9 +206,14 @@ def main():
                         print("Invalid square format. Use format like 'e4'.")
 
                 print(f"Sending move from {src} to {dst}...")
+                #Measure the time taken
+                start_time = time.time()
+
                 send_command(ser, cmd=0x03, from_pos=from_pos, to_pos=to_pos)
                 board, status = receive_data(ser)  # Receive the board and status from FPGA
-
+                end_time = time.time()
+                elapsed_time = end_time - start_time
+                print(f"Move processed in {elapsed_time:.3f} seconds.")
     except KeyboardInterrupt:
         print("KeyboardInterrupt detected. Exiting...")
     except serial.SerialException as e:

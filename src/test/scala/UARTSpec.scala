@@ -41,8 +41,8 @@ class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
                 // Data bits
             for (i <- 0 until 8) { // Only 4 bits for each square
                 val expectedBit = (byte >> i) & 1
-                println(s"Sending byte: ${byte.toHexString}, bit $i: $expectedBit")
-                println(s"TX line: ${dut.io.tx.peek().litValue}")
+                //println(s"Sending byte: ${byte.toHexString}, bit $i: $expectedBit")
+                //println(s"TX line: ${dut.io.tx.peek().litValue}")
                 dut.io.tx.expect((expectedBit == 1).B)
                 dut.clock.step(countMax)
             }
@@ -59,8 +59,8 @@ class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
         for (i <- 0 until 8) {
             val responseStatusByte = dut.io.responseStatus.peek()
             val expectedBit = (responseStatusByte.litValue >> i) & 1
-            println(s"Sending response status byte: ${responseStatusByte.litValue.toString}, bit $i: $expectedBit")
-            println(s"TX line: ${dut.io.tx.peek().litValue}")
+            //println(s"Sending response status byte: ${responseStatusByte.litValue.toString}, bit $i: $expectedBit")
+            //println(s"TX line: ${dut.io.tx.peek().litValue}")
             dut.io.tx.expect((expectedBit == 1).B)
             dut.clock.step(countMax)
         }
@@ -71,32 +71,54 @@ class UARTSpec extends AnyFlatSpec with ChiselScalatestTester {
         dut.io.busy.expect(false.B) // Ensure busy is false after sending all bytes
     }
   }
-  /* TODO: Implement UART receive test
-  "UART" should "receive data correctly" in {
-    test(new UartRx(baudRate = 115200, clockFreq = 1000000)) { dut =>
-        val testBytes = Seq(0x12, 0x34, 0x56, 0x78)
-        val countMax = (1000000 / 115200)
-        for (byte <- testBytes) {
-            // Start bit
-            dut.io.rx.poke(false.B)
-            dut.clock.step(countMax)
-    
-            // Data bits
-            for (i <- 0 until 8) {
-                val bitToSend = (byte >> i) & 1
-                dut.io.rx.poke((bitToSend == 1).B)
-                dut.clock.step(countMax)
-            }
-    
-            // Stop bit
-            dut.io.rx.poke(true.B)
-            dut.clock.step(countMax)
-    
-            // Check if the received byte is correct
-            dut.clock.step(countMax) // Wait for the receiver to process the stop bit
-            dut.io.dataValid.expect(true.B)
-            dut.io.dataOut.expect(byte.U)
-        }
+  "UART" should "receive a move" in { // Test the UART receiver
+    test(new UartTop(baudRate = 115200, clockFreq = 1000000)) { dut =>
+val fromPos = 0x12
+    val toPos = 0x34
+    val command = 0x03
+    val checksum = command ^ fromPos ^ toPos
+    val packet = Seq(0xFF, command, fromPos, toPos, checksum)
+
+    def sendByte(byte: Int): Unit = {
+      // Start bit
+      dut.io.rx.poke(false.B)
+      dut.clock.step(countMax)
+
+      // 8 data bits (LSB first)
+      for (i <- 0 until 8) {
+        val bitToSend = (byte >> i) & 1
+        dut.io.rx.poke((bitToSend == 1).B)
+        dut.clock.step(countMax)
+      }
+
+      // Stop bit
+      dut.io.rx.poke(true.B)
+      dut.clock.step(countMax)
     }
-  }*/
+
+    // Idle line
+    dut.io.rx.poke(true.B)
+    dut.io.commandReady.poke(false.B)
+    dut.clock.step(countMax)
+
+    // Transmit all 5 bytes
+    for (b <- packet) {
+      sendByte(b)
+    }
+
+    // Allow a few cycles for UartRx's input synchronizer + pending register to update
+    dut.clock.step(5)
+
+    // Verify latched command
+    dut.io.commandValid.expect(true.B)
+    dut.io.command.expect(command.U)
+    dut.io.from.expect(fromPos.U)
+    dut.io.to.expect(toPos.U)
+
+    // Complete handshake
+    dut.io.commandReady.poke(true.B)
+    dut.clock.step(1)
+    dut.io.commandValid.expect(false.B)
+    }
+    }
 }

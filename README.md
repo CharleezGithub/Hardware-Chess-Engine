@@ -162,3 +162,20 @@ Replies have no header or checksum; keep serial requests and replies aligned.
 Both sides apply promotion automatically; there is no promotion-choice field.
 The reply after a legal human move contains the board after the engine's reply,
 or the final board if the game ended before the engine could move.
+
+
+## Chess engine results in different depth
+
+The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. All time measurements are taken with a target clock of **20 MHz** (50 ns period).
+
+**Available FPGA Resources:** 20,800 LUTs | 41,600 FFs | 106 I/O | 32 BUFG | 5 MMCM
+
+| Search Depth | LUTs (Used / %) | Flip-Flops (Used / %) | I/O | BUFG | MMCM | WNS (ns) | Response Time / Notes |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **2** | 8,213 (39.49%) | 1,451 (3.49%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.998 | — |
+| **4** | 8,475 (40.75%) | 1,765 (4.24%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.526 | 0.05 – 0.1 s per move |
+| **5** | 8,417 (40.47%) | 1,922 (4.62%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 23.372 | 0.5 – 12 s per move |
+| **6** | 9,270 (44.57%) | 3,639 (8.75%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.758 | 4.175 - 27.5 s per move |
+| **8** | 8,514 (40.93%) | 2,388 (5.74%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 20.828 | 4.175 - 27.5 s per move |
+| **10** | 9,141 (43.95%) | 2,709 (6.51%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.422 | Timed out  > 600 s|
+| **16** | 9,270 (44.57%) | 3,638 (8.75%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | N/A | Timed out (> 30 s) |

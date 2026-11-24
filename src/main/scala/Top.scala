@@ -2,7 +2,7 @@ import chisel3._
 import chisel3.util._
 
 // The Basys wrapper supplies 20 MHz. Simulation uses a shorter UART bit period.
-class Top(clockFreq: Int = 20000000, baudRate: Int = 115200, maxDepth: Int = 3)
+class Top(clockFreq: Int = 20000000, baudRate: Int = 115200, maxDepth: Int = 7)
     extends Module {
   val io = IO(new Bundle {
     val tx = Output(Bool())
