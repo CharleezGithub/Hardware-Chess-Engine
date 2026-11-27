@@ -195,11 +195,21 @@ The time estimations are based on a sequence of several moves rather than a sing
 5. Pawn `g2` to `g3`
 6. Bishop `f1` to `h3`
 
-### Analysis & Optimal Depth Selection
-In a normal game of chess, each player is given a clock counting down from 10 minutes. Meaning each player has a total of 10 minutes allocated of thinking. Therefore a chess engine of higher depth, for example 9, will able to compute higher quality moves, but lose on time after a few moves. Therefore the response time is a very relevent measurement for the chess engine's perfomance, and needs to be within a reasonable range that doesnt not result in the engine losing in a time out, but still can compute good quality.
-At a depth of 7, computation time can last up to nearly 1 minute, while at a depth of 6 it shouldn't exceed 10 seconds. Therefor the most optimal depth of our chess engine is 6.
+## Analysis & Optimal Depth Selection
+According to chessworld [ChessWorld](https://www.chessworld.net/how-many-moves-are-in-an-average-chess-game.asp), in an average game of chess each player performs 40 moves, where each player is given a clock counting down from 10 minutes. Meaning each player has a total of 10 minutes allocated of thinking, or 15 seconds on average per move to think. Therefore a chess engine of higher depth, for example 9, may be able to compute higher quality moves, but lose on time after a few moves. Therefore the response time is a very relevant measurement for the chess engine's performance, and needs to be within a reasonable range that does not result in the engine losing in a time out, but still can compute good quality.
+At a depth of 7, computation time can last up to nearly 1 minute, while at a depth of 6 it shouldn't exceed 10 seconds. Therefore the most optimal depth of our chess engine is 6.
+### Area
+As can be seen in the search depth analysis table, the Flip Flop and LUT usage proposes no real bottleneck for our chess engine generator. This is mainly due to the hardware we generate based on depth only consisting of registers, which is also why LUT usage remains roughly the same (~52-58%). The registers generated are enough to calculate one of the search trees main branch, these same registers are then used to calculate another branch. This allows linear register growth based on the tree depth, as can be observed in the search depth analysis table our chess hardware generator grows about 155 Flip Flops per depth level. 
+### $F_{max}$
+Across the 9 different builds displayed in the search depth analysis table, the max frequency stays within the $32.8\text{ - }34 \text{ MHz}$ leaving only $0.7\text{ - }1.8 \text{ ns}$ of slack. Since our current chess engine generator design cannot run at a higher frequency than $34 \text{ MHz}$, we would have to optimize our current design to possibly increase the board frequency. The current given critical path, from Vivado, is:
 
 
+
+| Source (`From`) | Destination (`To`) | Slack (ns) | Total Delay (ns) | Logic Delay (ns) | Net Delay (ns) |
+| :---: | :--- | :--- | :---: | :---: | :---: |
+| `game/search/workingBoard_0_7_reg/C` | `game/search/returnedScore_reg/D` | 1.664 | 29.519 | 12.084 | 17.435 |
+
+This critical path is where the evaluator reads all the 64 squares in parallel, and sums their scores combinatorially in a single clock cycle. If we pipeline the evaluation process, we may be able to increase the clock frequency, but we would have to increase it by a factor of 4, before considering a higher depth more optimal.
 
 ## Use of Ai 
 Generative Ai has been used for this project, mainly as code helper and advisor.
