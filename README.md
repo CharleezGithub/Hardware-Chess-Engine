@@ -185,6 +185,7 @@ $$F_{\max} = \frac{1}{T_{\text{clk}} - \text{WNS}} = \frac{1000}{31.25 - \text{W
 | **7** | 11,719 (56.34%) | 2,382 (5.73%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.565 | 33.69 | 5.025 – 55.117 s per move |
 | **8** | 11,046 (53.11%) | 2,537 (6.10%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.026 | 33.09 | 62.748 – 737.251 s per move |
 | **9** | 12,038 (57.88%) | 2,687 (6.46%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.297 | 33.39 | 408.026 – 5945.780 s per move |
+
 The time estimations are based on a sequence of several moves rather than a single measurement. Opening moves are significantly faster because major pieces like the rook and queen are blocked, resulting in a much narrower search tree at the beginning of the game. Because the branching factor widens as pieces develop, a min–max time range is reported across the following fixed move sequence:
 
 1. Pawn `d2` to `d4`
