@@ -166,24 +166,25 @@ or the final board if the game ended before the engine could move.
 
 ## Chess engine results in different depth
 
-The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. All time measurements are taken with a target clock of **20 MHz** ($T_{\text{clk}} = 50\text{ ns}$).
+The on-board FPGA build utilization is determined by Vivado, and the listed values provide a performance overview when generating a more complex search tree for the chess engine. Execution time is measured using the Python `time` module, starting right before packaging the move for UART transmission and stopping when `UART.py` receives the response frame. All time measurements are taken with a target clock of **32 MHz** ($T_{\text{clk}} = 31.25\text{ ns}$).
 
 The maximum operating frequency ($F_{\max}$) is calculated from the target clock period and Worst Negative Slack (WNS):
 
-$$F_{\max} = \frac{1}{T_{\text{clk}} - \text{WNS}} = \frac{1000}{50 - \text{WNS}}\text{ MHz}$$
+$$F_{\max} = \frac{1}{T_{\text{clk}} - \text{WNS}} = \frac{1000}{31.25 - \text{WNS}}\text{ MHz}$$
 
 **Available FPGA Resources:** 20,800 LUTs | 41,600 FFs | 106 I/O | 32 BUFG | 5 MMCM
 
 | Search Depth | LUTs (Used / %) | Flip-Flops (Used / %) | I/O | BUFG | MMCM | WNS (ns) | $F_{\max}$ (MHz) | Response Time / Notes |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **2** | 8,213 (39.49%) | 1,451 (3.49%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.998 | 37.03 | — |
-| **4** | 8,475 (40.75%) | 1,765 (4.24%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.526 | 36.40 | 0.05 – 0.1 s per move |
-| **5** | 8,417 (40.47%) | 1,922 (4.62%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 23.372 | 37.55 | 0.5 – 12 s per move |
-| **6** | 9,270 (44.57%) | 3,639 (8.75%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.758 | 36.71 | 4.175 – 27.5 s per move |
-| **7** | 8,553 (41.12%) | 2,240 (5.38%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.053 | 35.78 | 63.94 – 532.134 s per move |
-| **8** | 8,514 (40.93%) | 2,388 (5.74%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 20.828 | 34.28 | Timed out (> 600 s) |
-| **10** | 9,141 (43.95%) | 2,709 (6.51%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 22.422 | 36.26 | Timed out (> 600 s) |
-
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **1** | 10,796 (51.90%) | 1,446 (3.48%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.838 | 34.00 | 0.004 – 0.016 s per move |
+| **2** | 11,285 (54.25%) | 1,595 (3.83%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 0.985 | 33.04 | 0.006 – 0.016 s per move |
+| **3** | 11,052 (53.13%) | 1,749 (4.20%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.069 | 33.13 | 0.005 – 0.021 s per move |
+| **4** | 11,014 (52.95%) | 1,906 (4.58%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 0.733 | 32.77 | 0.02 – 0.041 s per move |
+| **5** | 10,859 (52.21%) | 2,070 (4.98%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.078 | 33.14 | 0.061 – 1.318 s per move |
+| **6** | 11,210 (53.89%) | 2,229 (5.36%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.664 | 33.80 | 0.568 – 8.071 s per move |
+| **7** | 11,719 (56.34%) | 2,382 (5.73%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.565 | 33.69 | 5.025 – 55.117 s per move |
+| **8** | 11,046 (53.11%) | 2,537 (6.10%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.026 | 33.09 | 62.748 – 737.251 s per move |
+| **9** | 12,038 (57.88%) | 2,687 (6.46%) | 21 (19.81%) | 2 (6.25%) | 1 (20%) | 1.297 | 33.39 | 408.026 – 5945.780 s per move |
 The time estimations are based on a sequence of several moves rather than a single measurement. Opening moves are significantly faster because major pieces like the rook and queen are blocked, resulting in a much narrower search tree at the beginning of the game. Because the branching factor widens as pieces develop, a min–max time range is reported across the following fixed move sequence:
 
 1. Pawn `d2` to `d4`
@@ -194,6 +195,8 @@ The time estimations are based on a sequence of several moves rather than a sing
 6. Bishop `f1` to `h3`
 
 ### Analysis & Optimal Depth Selection
+In a normal game of chess, each player is given a clock counting down from 10 minutes. Meaning each player has a total of 10 minutes allocated of thinking. Therefore a chess engine of higher depth, for example 9, will able to compute higher quality moves, but lose on time after a few moves. Therefore the response time is a very relevent measurement for the chess engine's perfomance, and needs to be within a reasonable range that doesnt not result in the engine losing in a time out, but still can compute good quality.
+At a depth of 7, computation time can last up to nearly 1 minute, while at a depth of 6 it shouldn't exceed 10 seconds. Therefor the most optimal depth of our chess engine is 6.
 
 
 
